@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 6, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"","debugId":null}},
+    {"offset": {"line": 18, "column": 0}, "map": {"version":3,"sources":["file:///media/drive/Project/finance-assistant-Frontend/src/app/finance/page.jsx"],"sourcesContent":["import React from 'react'\n\nconst page = () => {\n  return (\n    <div>page</div>\n  )\n}\n\nexport default page"],"names":[],"mappings":";;;;AAAA;;;AAEA,MAAM,OAAO;IACX,qBACE,8OAAC;kBAAI;;;;;;AAET;uCAEe","debugId":null}}]
+}
