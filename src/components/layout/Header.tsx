@@ -1,5 +1,5 @@
 import { Brain } from "lucide-react";
-import { Navigation } from "@/components/ui/navigation";
+
 
 export function Header() {
   return (
