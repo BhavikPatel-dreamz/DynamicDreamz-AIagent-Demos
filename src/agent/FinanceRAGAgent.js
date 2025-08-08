@@ -1,346 +1,111 @@
-import QdrantManager from "../Clients/QdrantManager.js";
-import JinaClient from "../Clients/JinaClient.js";
+// Final Fixed FinanceRAGAgent.js (Enhanced Prompt: includes historyContext)
 import MongoManager from "../Clients/MongoManager.js";
-import Groqclient from "../Clients/GroqClient.js";
+import GroqClient from "../Clients/GroqClient.js";
 
 class FinanceRAGAgent {
   constructor(config) {
     const {
-      collectionName = "financial_documents",
       mongoDbName = "finance_assistant",
       maxHistoryLength = 20,
     } = config;
 
-    // Initialize Qdrant client
-    this.qdrantClient = new QdrantManager();
-    this.jinaClient = new JinaClient();
-    this.groqClient = new Groqclient();
-
-    this.collectionName = collectionName;
+    this.groqClient = new GroqClient();
     this.maxHistoryLength = maxHistoryLength;
     this.dbPromise = new MongoManager({ dbName: mongoDbName }).connect();
     this.db = null;
-
-    // In-memory financial data (like your original code)
-    this.expenseDB = [];
-    this.incomeDB = [];
   }
-  /**
-   * Initialize MongoDB connection
-   */
+
   async initializeDB() {
-    try {
-      if (!this.db) {
+    if (!this.db) {
+      try {
         this.db = await this.dbPromise;
+        console.log("Database connection established");
+        
+        // List all collections to verify connection
+        const collections = await this.db.listCollections().toArray();
+        console.log("Available collections:", collections.map(c => c.name));
+      } catch (error) {
+        console.error("Error initializing database:", error);
+        throw error;
       }
-
-      // Create indexes for better performance
-    //   await this.db.collection('chat_sessions').createIndex({ sessionId: 1 });
-    //   await this.db.collection('chat_sessions').createIndex({ userId: 1 });
-    //   await this.db.collection('chat_sessions').createIndex({ lastActivity: -1 });
-    //   await this.db.collection('chat_messages').createIndex({ sessionId: 1, timestamp: 1 });
-    //   await this.db.collection('financial_transactions').createIndex({ userId: 1, date: -1 });
-    //   await this.db.collection('financial_analytics').createIndex({ timestamp: -1 });
-
-      console.log("MongoDB connected successfully");
-    } catch (error) {
-      console.error("MongoDB connection error:", error);
-      throw error;
-    }
-  }
-  
-
-  /**
-   * Close MongoDB connection
-   */
-  async closeDB() {
-    if (this.mongoClient) {
-      await this.mongoClient.close();
     }
   }
 
-  /**
-   * Generate embeddings using Jina API
-   */
-  async embedText(text, model = "jina-embeddings-v2-base-en") {
-
-    const embedding = await this.jinaClient.embedText(text, model);
-    if (!embedding || embedding.length === 0) {
-      throw new Error("Failed to generate embedding for the text.");
-    }
-     
-  }
-
-  /**
-   * Search for similar financial documents in Qdrant
-   */
-  async searchFinancialDocuments(queryVector, limit = 5, scoreThreshold = 0.6) {
-    try {
-      const searchResult = await this.qdrantClient.search(this.collectionName, {
-        vector: queryVector,
-        limit: limit,
-        score_threshold: scoreThreshold,
-        with_payload: true,
-        with_vector: false,
-      });
-
-      const documents = searchResult.map((result) => ({
-        id: result.id,
-        score: result.score,
-        content: result.payload?.content || "",
-        documentData: result.payload?.documentData || {},
-        metadata: result.payload?.metadata || {},
-      }));
-
-      return documents;
-    } catch (error) {
-      console.error("Error searching financial documents:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create or get chat session (by userId only)
-   */
   async createChatSession(userId) {
-    if (!this.db) await this.initializeDB();
-
-    console.log(`Creating or updating chat session for user ${userId}`);
-    const existingSession = await this.db
-      .collection("chat_sessions")
-      .findOne({ userId });
-
-    if (!existingSession) {
-      const session = {
+    await this.initializeDB();
+    // Use the MongoManager's createChatSession method
+    // Since we don't have a separate MongoManager instance here, we'll implement similar logic
+    const session = await this.db.collection("chat_sessions").findOne({ userId });
+    if (!session) {
+      const sessionId = `finance_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await this.db.collection("chat_sessions").insertOne({
+        sessionId,
         userId,
         createdAt: new Date(),
         lastActivity: new Date(),
         messageCount: 0,
-        queryCount: 0,
-        status: "active",
         type: "finance",
-      };
-
-      await this.db.collection("chat_sessions").insertOne(session);
+        status: "active",
+      });
     } else {
-      await this.db
-        .collection("chat_sessions")
-        .updateOne({ userId }, { $set: { lastActivity: new Date() } });
+      await this.db.collection("chat_sessions").updateOne(
+        { userId },
+        { $set: { lastActivity: new Date() } }
+      );
     }
   }
 
-  /**
-   * Add message to chat history in MongoDB (by userId)
-   */
   async addToHistory(userId, role, content, metadata = {}) {
-    if (!this.db) await this.initializeDB();
-
-    const message = {
+    await this.initializeDB();
+    await this.db.collection("chat_messages").insertOne({
       userId,
       role,
       content,
       timestamp: new Date(),
       metadata,
-    };
-
-    await this.db.collection("chat_messages").insertOne(message);
-
+    });
     await this.db.collection("chat_sessions").updateOne(
       { userId },
-      {
-        $inc: { messageCount: 1 },
-        $set: { lastActivity: new Date() },
-      }
+      { $inc: { messageCount: 1 }, $set: { lastActivity: new Date() } }
     );
-
     await this.cleanupOldMessages(userId);
   }
 
-  /**
-   * Get chat history from MongoDB (by userId)
-   */
-  async getChatHistory(userId, limit = null) {
-    if (!this.db) await this.initializeDB();
-
-    const query = { userId };
-    const options = {
-      sort: { timestamp: 1 },
-      limit: limit || this.maxHistoryLength,
-    };
-
-    const messages = await this.db
+  async getChatHistory(userId, limit = this.maxHistoryLength) {
+    await this.initializeDB();
+    return this.db
       .collection("chat_messages")
-      .find(query, options)
+      .find({ userId })
+      .sort({ timestamp: 1 })
+      .limit(limit)
       .toArray();
-
-    return messages;
   }
 
-  /**
-   * Clean up old messages (by userId)
-   */
   async cleanupOldMessages(userId) {
-    if (!this.db) return;
-
-    const totalMessages = await this.db
-      .collection("chat_messages")
-      .countDocuments({ userId });
-
-    if (totalMessages > this.maxHistoryLength) {
-      const messagesToDelete = await this.db
-        .collection("chat_messages")
+    const count = await this.db.collection("chat_messages").countDocuments({ userId });
+    if (count > this.maxHistoryLength) {
+      const old = await this.db.collection("chat_messages")
         .find({ userId })
         .sort({ timestamp: 1 })
-        .limit(totalMessages - this.maxHistoryLength)
+        .limit(count - this.maxHistoryLength)
         .toArray();
-
-      const idsToDelete = messagesToDelete.map((msg) => msg._id);
-      await this.db.collection("chat_messages").deleteMany({
-        _id: { $in: idsToDelete },
-      });
+      const ids = old.map((m) => m._id);
+      await this.db.collection("chat_messages").deleteMany({ _id: { $in: ids } });
     }
   }
 
-  /**
-   * Get financial context for AI
-   */
-  async getFinancialContext(userId) {
-    // Get transactions from MongoDB
-    const transactions = await this.getUserTransactions(userId);
+  async chatWithFinanceHistory(userId, query) {
+    
+    
+    await this.createChatSession(userId);
+    await this.addToHistory(userId, "user", query);
 
-    const expenses = transactions.filter((t) => t.type === "expense");
-    const income = transactions.filter((t) => t.type === "income");
-
-    const totalIncome = income.reduce((acc, item) => acc + item.amount, 0);
-    const totalExpense = expenses.reduce((acc, item) => acc + item.amount, 0);
-    const balance = totalIncome - totalExpense;
-
-    let context = `\n=== CURRENT FINANCIAL STATUS ===\n`;
-    context += `Balance: ₹${balance}\n`;
-    context += `Total Income: ₹${totalIncome}\n`;
-    context += `Total Expenses: ₹${totalExpense}\n`;
-    context += `Total Transactions: ${transactions.length}\n\n`;
-
-    if (income.length > 0) {
-      context += `=== RECENT INCOME ===\n`;
-      income.slice(-5).forEach((item, index) => {
-        const date = new Date(item.date).toLocaleDateString();
-        context += `${index + 1}. ${item.name}: ₹${item.amount} (${date})\n`;
-      });
-      context += `\n`;
-    }
-
-    if (expenses.length > 0) {
-      context += `=== RECENT EXPENSES ===\n`;
-      expenses.slice(-5).forEach((item, index) => {
-        const date = new Date(item.date).toLocaleDateString();
-        context += `${index + 1}. ${item.name}: ₹${item.amount} (${date})\n`;
-      });
-      context += `\n`;
-    }
-
-    // Add spending categories
-    if (expenses.length > 0) {
-      const categories = {};
-      expenses.forEach((expense) => {
-        const category = this.categorizeExpense(expense.name);
-        categories[category] = (categories[category] || 0) + expense.amount;
-      });
-
-      context += `=== SPENDING BY CATEGORY ===\n`;
-      Object.entries(categories).forEach(([category, amount]) => {
-        context += `${category}: ₹${amount}\n`;
-      });
-      context += `\n`;
-    }
-
-    return context;
-  }
-
-  /**
-   * Categorize expenses
-   */
-  categorizeExpense(name) {
-    const lowercaseName = name.toLowerCase();
-
-    if (
-      lowercaseName.includes("food") ||
-      lowercaseName.includes("restaurant") ||
-      lowercaseName.includes("grocery") ||
-      lowercaseName.includes("meal")
-    ) {
-      return "Food & Dining";
-    }
-    if (
-      lowercaseName.includes("transport") ||
-      lowercaseName.includes("fuel") ||
-      lowercaseName.includes("taxi") ||
-      lowercaseName.includes("bus")
-    ) {
-      return "Transportation";
-    }
-    if (
-      lowercaseName.includes("shopping") ||
-      lowercaseName.includes("clothes") ||
-      lowercaseName.includes("electronics")
-    ) {
-      return "Shopping";
-    }
-    if (
-      lowercaseName.includes("entertainment") ||
-      lowercaseName.includes("movie") ||
-      lowercaseName.includes("game")
-    ) {
-      return "Entertainment";
-    }
-    if (
-      lowercaseName.includes("medical") ||
-      lowercaseName.includes("health") ||
-      lowercaseName.includes("doctor")
-    ) {
-      return "Healthcare";
-    }
-    if (
-      lowercaseName.includes("rent") ||
-      lowercaseName.includes("utilities") ||
-      lowercaseName.includes("electricity")
-    ) {
-      return "Housing";
-    }
-
-    return "Other";
-  }
-
-  /**
-   * Generate finance-specific response with RAG and chat history
-   */
-  async generateFinanceResponse(
-    userId,
-    question,
-    contextDocuments,
-    model = "llama3-8b-8192"
-  ) {
-    const chatHistory = await this.getChatHistory(userId, 10);
     const financialContext = await this.getFinancialContext(userId);
+    const chatHistory = await this.getChatHistory(userId);
 
-    // Prepare context from retrieved documents
-    const ragContext =
-      contextDocuments.length > 0
-        ? contextDocuments
-            .map(
-              (doc, i) =>
-                `Document ${i + 1} (Score: ${doc.score.toFixed(3)}):\n${
-                  doc.content
-                }`
-            )
-            .join("\n\n")
-        : "No relevant financial documents found in knowledge base.";
-
-    // Prepare chat history context
-    const historyContext =
-      chatHistory.length > 0
-        ? chatHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
-        : "No previous conversation history.";
+    const historyContext = chatHistory.length > 0
+      ? chatHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
+      : "No previous conversation history.";
 
     const systemPrompt = `You are Bhavik Patel, a helpful personal finance assistant. You help users manage their expenses, income, and financial planning.
 
@@ -352,8 +117,14 @@ You have access to:
 ${financialContext}
 
 Available tools (respond with EXACTLY this format when needed, and only one tool per user action):
-- TOOL:addExpense:{"name":"description","amount":123} - to add an expense
-- TOOL:addIncome:{"name":"description","amount":123} - to add income  
+- If the user says things like "spent", "paid", "bought", "expense", or similar phrases about spending money, use TOOL:addExpense with name/amount from the sentence. Examples:
+  * TOOL:addExpense:{"name":"groceries","amount":500}
+  * TOOL:addExpense:{"name":"dinner","amount":1500}
+- If the user says things like "I earned", "I received", "I got paid", "add income", "salary", "bonus", or similar phrases about receiving money, use TOOL:addIncome with name/amount from the sentence. Examples:
+  * TOOL:addIncome:{"name":"salary","amount":50000}
+  * TOOL:addIncome:{"name":"bonus","amount":10000}
+  * TOOL:addIncome:{"name":"freelance work","amount":2500}
+  * TOOL:addIncome:{"name":"gift","amount":5000}
 - TOOL:getTotalExpense:{} - to get total expenses
 - TOOL:getBalance:{} - to get current balance
 - TOOL:getExpensesByCategory:{} - to get expenses grouped by category
@@ -373,362 +144,270 @@ Guidelines:
 - Keep responses helpful and educational.
 - Reference previous conversation context when relevant`;
 
-    const userPrompt = `Previous conversation:
-${historyContext}
+    const userPrompt = `Previous conversation:\n${historyContext}\n\nCurrent question: ${query}\n\nProvide helpful financial advice, answer the question using available context, and suggest tools if needed.`;
 
-Financial knowledge base context:
-${ragContext}
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ];
 
-Current question: ${question}
+    const result = await this.groqClient.chat(messages);
 
-Provide helpful financial advice, answer the question using available context, and suggest tools if needed.`;
+    console.log("AI response:", result);
+    // Find all tool calls in the response
+    const toolMatches = [...result.matchAll(/TOOL:(\w+):(\{[^}]*\})/g)];
+    console.log("Tool matches:", toolMatches);
+    let toolOutput = null;
 
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${this.groqApiKey}`,
-    };
-
-    const message =  [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ]
-
-    try {
-      return  await this.groqClient.chat(message)
-       
-    } catch (error) {
-      console.error(
-        "Error generating response:",
-        error.response?.data || error.message
-      );
-      throw error;
-    }
-
-
-  }
-
-  /**
-   * Main chat method with RAG and history (by userId only)
-   */
-  async chatWithFinanceHistory(userId, query, options = {}) {
-    const startTime = Date.now();
-
-    const {
-      limit = 5,
-      scoreThreshold = 0.6,
-      embeddingModel = "jina-embeddings-v2-base-en",
-      chatModel = "llama3-8b-8192",
-    } = options;
-
-    try {
-      // Ensure session exists
-      await this.createChatSession(userId);
-      console.log(`Processing finance query for user ${userId}:`, query);
-
-      // Add user message to history
-      await this.addToHistory(userId, "user", query);
-
-      // Step 1: Generate embedding and search knowledge base
-      console.log("Searching financial knowledge base...");
-      let contextDocuments = [];
-
-    //   try {
-    //     const queryVector = await this.embedText(query, embeddingModel);
-    //     contextDocuments = await this.searchFinancialDocuments(
-    //       queryVector,
-    //       limit,
-    //       scoreThreshold
-    //     );
-    //   } catch (error) {
-    //     console.warn(
-    //       "RAG search failed, continuing without knowledge base context:",
-    //       error.message
-    //     );
-    //   }
-
-      // Step 2: Generate contextual response
-      console.log("Generating financial advice...");
-      const response = await this.generateFinanceResponse(
-        userId,
-        query,
-        contextDocuments,
-        chatModel
-      );
-
-      // Remove tool codes from the AI response for the user
-      const cleanedResponse = typeof response === "string"
-        ? response
-            .split('\n')
-            .filter(line => !line.trim().startsWith('TOOL:'))
-            .join('\n')
-        : response;
-
-      const processingTime = Date.now() - startTime;
-      const chatHistory = await this.getChatHistory(userId, 10);
-
-      // Handle tool usage
-      if (chatHistory.length > 1 && response.includes("TOOL:")) {
-        const toolResult = await this.handleFinanceTools(response, userId);
-
-        // Add tool result to history (internal, not user-facing)
-        await this.addToHistory(userId, "assistant", toolResult, {
-          type: "tool_response",
-          documentsFound: contextDocuments.length,
-          processingTime: processingTime,
-        });
-
-        // Return only the cleaned response to the user
-        return {
-          userId,
-          query,
-          type: "tool_response",
-          response: cleanedResponse, // <--- always cleaned!
-          contextDocuments,
-          metadata: {
-            documentsFound: contextDocuments.length,
-            processingTime: processingTime,
-          },
-        };
-      } else {
-        // Add response to history
-        await this.addToHistory(userId, "assistant", cleanedResponse, {
-          type: "advice",
-          documentsFound: contextDocuments.length,
-          processingTime: processingTime,
-        });
-
-        return {
-          userId,
-          query,
-          type: "advice",
-          response: cleanedResponse, // <--- always cleaned!
-          contextDocuments,
-          metadata: {
-            documentsFound: contextDocuments.length,
-            processingTime: processingTime,
-          },
-        };
-      }
-    } catch (error) {
-      console.error("Error in finance chat session:", error);
-
-      // Add error to history
-      await this.addToHistory(userId, "system", `Error: ${error.message}`, {
-        type: "error",
-        error: error.message,
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Handle finance tools
-   */
-  async handleFinanceTools(response, userId) {
-    const toolMatches = response.matchAll(/TOOL:(\w+):({.*?})/g);
+    // Process each tool call
     for (const match of toolMatches) {
-      const [, toolName, toolParams] = match;
-
+      const tool = match[1];
+      const json = match[2];
+      console.log(`Matched tool: ${tool} with args: ${json}`);
+      let args = {};
       try {
-        const params = JSON.parse(toolParams);
-
-        switch (toolName) {
-          case "addExpense":
-            return await this.addExpense(userId, params);
-          case "addIncome":
-            return await this.addIncome(userId, params);
-          case "getTotalExpense":
-            return await this.getTotalExpense(userId);
-          case "getBalance":
-            return await this.getBalance(userId);
-          case "getExpensesByCategory":
-            return await this.getExpensesByCategory(userId);
-          case "getRecentTransactions":
-            return await this.getRecentTransactions(userId);
-          case "getBudgetAdvice":
-            return await this.getBudgetAdvice(userId);
-          case "getInvestmentSuggestions":
-            return await this.getInvestmentSuggestions(userId);
-          default:
-            return `Unknown tool: ${toolName}`;
+        args = JSON.parse(json);
+      } catch (e) {
+        console.error("Error parsing tool arguments:", e);
+        // If JSON parsing fails, try to extract name and amount manually
+        const nameMatch = json.match(/"name"\s*:\s*"([^"]+)"/);
+        const amountMatch = json.match(/"amount"\s*:\s*([\d.]+)/);
+        if (nameMatch && amountMatch) {
+          args = { name: nameMatch[1], amount: parseFloat(amountMatch[1]) };
         }
-      } catch (error) {
-        return `Error using tool: ${error.message}`;
+      }
+      
+      console.log(`Executing tool: ${tool} with args:`, args);
+      
+      let currentToolOutput = null;
+      if (tool === "addExpense") {
+        currentToolOutput = await this.addExpense(userId, args);
+      } else if (tool === "addIncome") {
+        currentToolOutput = await this.addIncome(userId, args);
+      } else if (tool === "getTotalExpense") {
+        currentToolOutput = await this.getTotalExpense(userId);
+      } else if (tool === "getBalance") {
+        currentToolOutput = await this.getBalance(userId);
+      } else if (tool === "getExpensesByCategory") {
+        currentToolOutput = await this.getExpensesByCategory(userId);
+      } else if (tool === "getRecentTransactions") {
+        currentToolOutput = await this.getRecentTransactions(userId);
+      } else if (tool === "getBudgetAdvice") {
+        currentToolOutput = await this.getBudgetAdvice(userId);
+      } else if (tool === "getInvestmentSuggestions") {
+        currentToolOutput = await this.getInvestmentSuggestions(userId);
+      }
+      
+      console.log(`Tool ${tool} output:`, currentToolOutput);
+      
+      // If this is the first tool output or if we want to accumulate all tool outputs,
+      // we can update toolOutput here
+      if (!toolOutput) {
+        toolOutput = currentToolOutput;
       }
     }
+
+    const userVisibleResponse = result.replace(/TOOL:.*/g, "").trim();
+    await this.addToHistory(userId, "assistant", userVisibleResponse);
+    if (toolOutput) await this.addToHistory(userId, "assistant", toolOutput, { type: "tool_execution" });
+
+    console.log("Returning response:", { response: userVisibleResponse, toolResult: toolOutput });
+    return { response: userVisibleResponse, toolResult: toolOutput };
   }
 
-  // Finance tool methods
-  async addExpense(userId, { name, amount }) {
-    if (!this.db) await this.initializeDB();
+  async getFinancialContext(userId) {
+    const txns = await this.getUserTransactions(userId);
+    const income = txns.filter(t => t.type === "income");
+    const expenses = txns.filter(t => t.type === "expense");
+    const totalIncome = income.reduce((a, b) => a + b.amount, 0);
+    const totalExpenses = expenses.reduce((a, b) => a + b.amount, 0);
+    const balance = totalIncome - totalExpenses;
 
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount)) return "Invalid amount. Please enter a valid number.";
-
-    const expense = {
-      userId,
-      name: name || "Expense",
-      amount: numAmount,
-      date: new Date(),
-      type: "expense",
-      category: this.categorizeExpense(name || "Expense"),
-    };
-
-    await this.db.collection("financial_transactions").insertOne(expense);
-    return `✅ Added expense: ${name} - ₹${numAmount}`;
-  }
-
-  async addIncome(userId, { name, amount }) {
-    if (!this.db) await this.initializeDB();
-
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount)) return "Invalid amount. Please enter a valid number.";
-
-    const income = {
-      userId,
-      name: name || "Income",
-      amount: numAmount,
-      date: new Date(),
-      type: "income",
-    };
-
-    await this.db.collection("financial_transactions").insertOne(income);
-    return `✅ Added income: ${name} - ₹${numAmount}`;
+    let out = `Balance: ₹${balance}\nIncome: ₹${totalIncome} | Expenses: ₹${totalExpenses}`;
+    return out;
   }
 
   async getUserTransactions(userId, limit = 100) {
-    if (!this.db) await this.initializeDB();
+    await this.initializeDB();
+    
+    try {
+      // Check if the collection exists
+      const collections = await this.db.listCollections().toArray();
+      const collectionNames = collections.map(c => c.name);
+      if (!collectionNames.includes("financial_transactions")) {
+        console.log("financial_transactions collection does not exist");
+        return [];
+      }
+      
+      const transactions = await this.db
+        .collection("financial_transactions")
+        .find({ userId })
+        .sort({ date: -1 })
+        .limit(limit)
+        .toArray();
+      
+      console.log(`Retrieved ${transactions.length} transactions for user ${userId}`);
+      return transactions;
+    } catch (error) {
+      console.error("Error retrieving user transactions:", error);
+      return [];
+    }
+  }
 
-    return await this.db
-      .collection("financial_transactions")
-      .find({ userId })
-      .sort({ date: -1 })
-      .limit(limit)
-      .toArray();
+  async addExpense(userId, { name, amount }) {
+    await this.initializeDB();
+    const amt = parseFloat(amount);
+    if (isNaN(amt)) return "Invalid amount.";
+    
+    try {
+      // Check if the collection exists and create it if it doesn't
+      const collections = await this.db.listCollections().toArray();
+      const collectionNames = collections.map(c => c.name);
+      if (!collectionNames.includes("financial_transactions")) {
+        console.log("Creating financial_transactions collection");
+        await this.db.createCollection("financial_transactions");
+      }
+      
+      const result = await this.db.collection("financial_transactions").insertOne({
+        userId,
+        name,
+        amount: amt,
+        type: "expense",
+        date: new Date(),
+      });
+      console.log(`Expense recorded for user ${userId}: ₹${amt} - ${name}`, result);
+      return `✅ Expense recorded: ₹${amt} - ${name}`;
+    } catch (error) {
+      console.error("Error recording expense:", error);
+      return "Error recording expense.";
+    }
+  }
+
+  async addIncome(userId, { name, amount }) {
+    await this.initializeDB();
+    const amt = parseFloat(amount);
+    if (isNaN(amt)) return "Invalid amount.";
+    
+    try {
+      // Check if the collection exists and create it if it doesn't
+      const collections = await this.db.listCollections().toArray();
+      const collectionNames = collections.map(c => c.name);
+      if (!collectionNames.includes("financial_transactions")) {
+        console.log("Creating financial_transactions collection");
+        await this.db.createCollection("financial_transactions");
+      }
+      
+      const result = await this.db.collection("financial_transactions").insertOne({
+        userId,
+        name,
+        amount: amt,
+        type: "income",
+        date: new Date(),
+      });
+      console.log(`Income recorded for user ${userId}: ₹${amt} - ${name}`, result);
+      return `✅ Income recorded: ₹${amt} - ${name}`;
+    } catch (error) {
+      console.error("Error recording income:", error);
+      return "Error recording income.";
+    }
   }
 
   async getTotalExpense(userId) {
-    const transactions = await this.getUserTransactions(userId);
-    const expenses = transactions.filter((t) => t.type === "expense");
-
-    if (expenses.length === 0) return "No expenses recorded yet.";
-
-    const total = expenses.reduce((acc, item) => acc + item.amount, 0);
-    return `📊 Total expenses: ₹${total} (${expenses.length} transactions)`;
+    const txns = await this.getUserTransactions(userId);
+    const expenses = txns.filter(t => t.type === "expense");
+    const total = expenses.reduce((a, b) => a + b.amount, 0);
+    return `Total expenses: ₹${total}`;
   }
 
   async getBalance(userId) {
-    const transactions = await this.getUserTransactions(userId);
-    const income = transactions.filter((t) => t.type === "income");
-    const expenses = transactions.filter((t) => t.type === "expense");
-
-    const totalIncome = income.reduce((acc, item) => acc + item.amount, 0);
-    const totalExpense = expenses.reduce((acc, item) => acc + item.amount, 0);
-    const balance = totalIncome - totalExpense;
-
-    if (transactions.length === 0) return "No transactions recorded yet.";
-
-    const status = balance >= 0 ? "✅" : "⚠️";
-    return `${status} Balance: ₹${balance} | Income: ₹${totalIncome} | Expenses: ₹${totalExpense}`;
+    const txns = await this.getUserTransactions(userId);
+    const income = txns.filter(t => t.type === "income");
+    const expenses = txns.filter(t => t.type === "expense");
+    const totalIncome = income.reduce((a, b) => a + b.amount, 0);
+    const totalExpenses = expenses.reduce((a, b) => a + b.amount, 0);
+    const balance = totalIncome - totalExpenses;
+    return `Current balance: ₹${balance}`;
   }
 
   async getExpensesByCategory(userId) {
-    const transactions = await this.getUserTransactions(userId);
-    const expenses = transactions.filter((t) => t.type === "expense");
-
-    if (expenses.length === 0) return "No expenses recorded yet.";
-
-    const categories = {};
-    expenses.forEach((expense) => {
-      const category = expense.category || this.categorizeExpense(expense.name);
-      if (!categories[category]) {
-        categories[category] = { total: 0, count: 0 };
+    const txns = await this.getUserTransactions(userId);
+    const expenses = txns.filter(t => t.type === "expense");
+    
+    const categoryTotals = {};
+    expenses.forEach(expense => {
+      const category = expense.category || "Uncategorized";
+      if (!categoryTotals[category]) {
+        categoryTotals[category] = 0;
       }
-      categories[category].total += expense.amount;
-      categories[category].count += 1;
+      categoryTotals[category] += expense.amount;
     });
 
-    let result = "📋 Expenses by Category:\n\n";
-    Object.entries(categories).forEach(([category, data]) => {
-      result += `${category}: ₹${data.total} (${data.count} transactions)\n`;
-    });
-
-    return result;
+    let result = "Expenses by category:\n";
+    for (const [category, total] of Object.entries(categoryTotals)) {
+      result += `${category}: ₹${total}\n`;
+    }
+    
+    return result.trim();
   }
 
-  async getRecentTransactions(userId, limit = 10) {
-    const transactions = await this.getUserTransactions(userId, limit);
-
-    if (transactions.length === 0) return "No transactions recorded yet.";
-
-    let result = "🕒 Recent Transactions:\n\n";
-    transactions.forEach((transaction, index) => {
-      const date = new Date(transaction.date).toLocaleDateString();
-      const emoji = transaction.type === "income" ? "💰" : "💸";
-      const sign = transaction.type === "income" ? "+" : "-";
-      result += `${index + 1}. ${emoji} ${transaction.name}: ${sign}₹${
-        transaction.amount
-      } (${date})\n`;
+  async getRecentTransactions(userId, limit = 5) {
+    const txns = await this.getUserTransactions(userId);
+    const recent = txns.slice(0, limit);
+    
+    let result = "Recent transactions:\n";
+    recent.forEach(txn => {
+      const type = txn.type === "income" ? "Income" : "Expense";
+      result += `${type}: ${txn.name} - ₹${txn.amount}\n`;
     });
-
-    return result;
+    
+    return result.trim();
   }
 
   async getBudgetAdvice(userId) {
-    const transactions = await this.getUserTransactions(userId);
-    // Implementation for budget advice based on spending patterns
-    return "💡 Based on your spending patterns, consider setting monthly budgets for your top expense categories.";
+    const txns = await this.getUserTransactions(userId);
+    const income = txns.filter(t => t.type === "income");
+    const expenses = txns.filter(t => t.type === "expense");
+    const totalIncome = income.reduce((a, b) => a + b.amount, 0);
+    const totalExpenses = expenses.reduce((a, b) => a + b.amount, 0);
+    
+    if (totalIncome === 0) {
+      return "No income recorded yet. Please add some income to get personalized budget advice.";
+    }
+    
+    const savingsRate = ((totalIncome - totalExpenses) / totalIncome) * 100;
+    
+    let advice = `Your current savings rate is ${savingsRate.toFixed(2)}%.\n`;
+    
+    if (savingsRate < 10) {
+      advice += "Consider reducing expenses or increasing income to improve your savings rate.";
+    } else if (savingsRate < 20) {
+      advice += "Good job! Try to increase your savings rate to 20% for better financial health.";
+    } else {
+      advice += "Excellent! You're maintaining a healthy savings rate.";
+    }
+    
+    return advice;
   }
 
   async getInvestmentSuggestions(userId) {
-    // Implementation for investment suggestions based on balance and income
-    return "📈 Consider investing in diversified mutual funds or SIPs based on your surplus income.";
-  }
-
-  /**
-   * Add financial documents to knowledge base
-   */
-  async addFinancialDocuments(documents) {
-    try {
-      const points = [];
-
-      for (const doc of documents) {
-        const searchableContent = `
-                    Title: ${doc.title || ""}
-                    Content: ${doc.content || ""}
-                    Category: ${doc.category || ""}
-                    Tags: ${
-                      Array.isArray(doc.tags)
-                        ? doc.tags.join(", ")
-                        : doc.tags || ""
-                    }
-                `.trim();
-
-        const embedding = await this.embedText(searchableContent);
-
-        points.push({
-          id: doc.id || Math.random().toString(36).substr(2, 9),
-          vector: embedding,
-          payload: {
-            content: searchableContent,
-            documentData: doc,
-            metadata: doc.metadata || {},
-          },
-        });
-      }
-
-      await this.qdrantClient.upsert(this.collectionName, {
-        wait: true,
-        points: points,
-      });
-
-     
-    } catch (error) {
-      console.error("Error adding financial documents:", error);
-      throw error;
+    const txns = await this.getUserTransactions(userId);
+    const income = txns.filter(t => t.type === "income");
+    const expenses = txns.filter(t => t.type === "expense");
+    const balance = income.reduce((a, b) => a + b.amount, 0) - expenses.reduce((a, b) => a + b.amount, 0);
+    
+    if (balance < 1000) {
+      return "Your balance is low. Focus on building an emergency fund before considering investments.";
     }
+    
+    let suggestions = "Investment suggestions based on your balance:\n";
+    suggestions += "- Consider a high-yield savings account for your emergency fund\n";
+    suggestions += "- Look into index funds for long-term growth\n";
+    suggestions += "- Consider diversifying with bonds or other assets";
+    
+    return suggestions;
   }
 }
 
 export default FinanceRAGAgent;
+
+

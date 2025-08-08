@@ -5,7 +5,7 @@ class GroqClient {
         const {
             apiKey = process.env.GROQ_API_KEY,
             baseURL = 'https://api.groq.com/openai/v1',
-            defaultModel = 'llama3-8b-8192',
+            defaultModel = 'openai/gpt-oss-120b',
             timeout = 30000
         } = config;
 

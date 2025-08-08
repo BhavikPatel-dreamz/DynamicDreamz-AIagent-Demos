@@ -12,6 +12,10 @@ const page = () => {
     const [sessionId, setSessionId] = useState('');
     const [showHistory, setShowHistory] = useState(false);
     const [historyMessages, setHistoryMessages] = useState([]);
+    const [showIncomeForm, setShowIncomeForm] = useState(false);
+    const [incomeForm, setIncomeForm] = useState({ name: '', amount: '' });
+    const [showExpenseForm, setShowExpenseForm] = useState(false);
+    const [expenseForm, setExpenseForm] = useState({ name: '', amount: '' });
 
     const chatEndRef = useRef(null);
     const API = `${process.env.NEXT_PUBLIC_API_URL}/api/finance`;
@@ -68,7 +72,14 @@ const page = () => {
             const data = await res.json();
 
             // Add assistant response to messages
-            setMessages([...newMessages, { sender: 'assistant', text: data.response }]);
+            let updatedMessages = [...newMessages, { sender: 'assistant', text: data.response }];
+            
+            // If there's a tool result, add it as a separate message
+            if (data.toolResult) {
+                updatedMessages = [...updatedMessages, { sender: 'assistant', text: data.toolResult }];
+            }
+            
+            setMessages(updatedMessages);
 
         } catch (err) {
             setMessages([...newMessages, { sender: 'assistant', text: '❌ Error connecting to backend.' }]);
@@ -131,6 +142,56 @@ const page = () => {
 
     const quickAction = (message) => {
         setInput(message);
+    };
+    
+    const handleIncomeFormChange = (e) => {
+        const { name, value } = e.target;
+        setIncomeForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+    
+    const handleAddIncome = async (e) => {
+        e.preventDefault();
+        if (!incomeForm.name.trim() || !incomeForm.amount) return;
+        
+        // Send a message to the AI to add income
+        const message = `I earned ${incomeForm.amount} from ${incomeForm.name}`;
+        setInput(message);
+        setIncomeForm({ name: '', amount: '' });
+        setShowIncomeForm(false);
+        
+        // Trigger the sendMessage function
+        setTimeout(() => {
+            const event = { preventDefault: () => {} };
+            sendMessage(event);
+        }, 100);
+    };
+    
+    const handleExpenseFormChange = (e) => {
+        const { name, value } = e.target;
+        setExpenseForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+    
+    const handleAddExpense = async (e) => {
+        e.preventDefault();
+        if (!expenseForm.name.trim() || !expenseForm.amount) return;
+        
+        // Send a message to the AI to add expense
+        const message = `I spent ${expenseForm.amount} on ${expenseForm.name}`;
+        setInput(message);
+        setExpenseForm({ name: '', amount: '' });
+        setShowExpenseForm(false);
+        
+        // Trigger the sendMessage function
+        setTimeout(() => {
+            const event = { preventDefault: () => {} };
+            sendMessage(event);
+        }, 100);
     };
 
     return (
@@ -352,7 +413,7 @@ const page = () => {
                             📋 Recent Transactions
                         </button>
                         <button
-                            onClick={() => quickAction("I spent 500 on groceries")}
+                            onClick={() => setShowExpenseForm(true)}
                             style={{
                                 padding: '8px 12px',
                                 backgroundColor: '#fd7e14',
@@ -363,10 +424,24 @@ const page = () => {
                                 fontSize: '12px'
                             }}
                         >
-                            💸 Add Expense
+                            📝 Direct Expense Entry
                         </button>
                         <button
-                            onClick={() => quickAction("I earned 50000 from salary")}
+                            onClick={() => quickAction("I spent 500 on groceries")}
+                            style={{
+                                padding: '8px 12px',
+                                backgroundColor: '#6c757d',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                            }}
+                        >
+                            💬 Add Expense (AI)
+                        </button>
+                        <button
+                            onClick={() => setShowIncomeForm(true)}
                             style={{
                                 padding: '8px 12px',
                                 backgroundColor: '#20c997',
@@ -377,9 +452,212 @@ const page = () => {
                                 fontSize: '12px'
                             }}
                         >
-                            💰 Add Income
+                            📝 Direct Income Entry
+                        </button>
+                        <button
+                            onClick={() => quickAction("I earned 50000 from salary")}
+                            style={{
+                                padding: '8px 12px',
+                                backgroundColor: '#007bff',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                            }}
+                        >
+                            💬 Add Income (AI)
                         </button>
                     </div>
+                    
+                    {/* Income Form Modal */}
+                    {showIncomeForm && (
+                        <>
+                            <div
+                                style={{
+                                    position: 'fixed',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    backgroundColor: 'rgba(0,0,0,0.5)',
+                                    zIndex: 999
+                                }}
+                                onClick={() => setShowIncomeForm(false)}
+                            />
+                            <div style={{
+                                position: 'fixed',
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                backgroundColor: 'white',
+                                padding: '20px',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                zIndex: 1000,
+                                width: '300px'
+                            }}>
+                                <h3 style={{ marginTop: 0 }}>Add Income</h3>
+                                <form onSubmit={handleAddIncome}>
+                                    <div style={{ marginBottom: '10px' }}>
+                                        <label style={{ display: 'block', marginBottom: '5px' }}>Source:</label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={incomeForm.name}
+                                            onChange={handleIncomeFormChange}
+                                            style={{
+                                                width: '100%',
+                                                padding: '8px',
+                                                borderRadius: '4px',
+                                                border: '1px solid #ccc'
+                                            }}
+                                            placeholder="e.g., Salary, Freelance, etc."
+                                        />
+                                    </div>
+                                    <div style={{ marginBottom: '10px' }}>
+                                        <label style={{ display: 'block', marginBottom: '5px' }}>Amount:</label>
+                                        <input
+                                            type="number"
+                                            name="amount"
+                                            value={incomeForm.amount}
+                                            onChange={handleIncomeFormChange}
+                                            style={{
+                                                width: '100%',
+                                                padding: '8px',
+                                                borderRadius: '4px',
+                                                border: '1px solid #ccc'
+                                            }}
+                                            placeholder="e.g., 50000"
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowIncomeForm(false)}
+                                            style={{
+                                                padding: '8px 12px',
+                                                backgroundColor: '#6c757d',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            style={{
+                                                padding: '8px 12px',
+                                                backgroundColor: '#20c997',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Add Income
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </>
+                    )}
+                    {/* Expense Form Modal */}
+                    {showExpenseForm && (
+                        <>
+                            <div
+                                style={{
+                                    position: 'fixed',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    backgroundColor: 'rgba(0,0,0,0.5)',
+                                    zIndex: 999
+                                }}
+                                onClick={() => setShowExpenseForm(false)}
+                            />
+                            <div style={{
+                                position: 'fixed',
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                backgroundColor: 'white',
+                                padding: '20px',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                zIndex: 1000,
+                                width: '300px'
+                            }}>
+                                <h3 style={{ marginTop: 0 }}>Add Expense</h3>
+                                <form onSubmit={handleAddExpense}>
+                                    <div style={{ marginBottom: '10px' }}>
+                                        <label style={{ display: 'block', marginBottom: '5px' }}>Category:</label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={expenseForm.name}
+                                            onChange={handleExpenseFormChange}
+                                            style={{
+                                                width: '100%',
+                                                padding: '8px',
+                                                borderRadius: '4px',
+                                                border: '1px solid #ccc'
+                                            }}
+                                            placeholder="e.g., Groceries, Rent, etc."
+                                        />
+                                    </div>
+                                    <div style={{ marginBottom: '10px' }}>
+                                        <label style={{ display: 'block', marginBottom: '5px' }}>Amount:</label>
+                                        <input
+                                            type="number"
+                                            name="amount"
+                                            value={expenseForm.amount}
+                                            onChange={handleExpenseFormChange}
+                                            style={{
+                                                width: '100%',
+                                                padding: '8px',
+                                                borderRadius: '4px',
+                                                border: '1px solid #ccc'
+                                            }}
+                                            placeholder="e.g., 500"
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowExpenseForm(false)}
+                                            style={{
+                                                padding: '8px 12px',
+                                                backgroundColor: '#6c757d',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            style={{
+                                                padding: '8px 12px',
+                                                backgroundColor: '#fd7e14',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Add Expense
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </>
+                    )}
                 </>
             )}
 
