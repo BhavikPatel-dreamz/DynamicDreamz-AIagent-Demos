@@ -32,8 +32,17 @@ const page = () => {
 
 
     useEffect(() => {
-        setSessionId(`session_${Date.now()}`);
-    }, []);
+        //get from the local storage
+        const storedSessionId = localStorage.getItem('finance_session_id');
+        if (storedSessionId) {
+            setSessionId(storedSessionId);
+        } else {
+            // Generate a new session ID if not found
+            const newSessionId = `session_${Date.now()}`;
+            localStorage.setItem('finance_session_id', newSessionId);
+            setSessionId(newSessionId);
+        }
+    }, []); 
 
 
     const sendMessage = async (e) => {

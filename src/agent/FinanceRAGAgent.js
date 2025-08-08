@@ -100,28 +100,19 @@ class FinanceRAGAgent {
   }
 
   /**
-   * Create or get chat session
+   * Create or get chat session (by userId only)
    */
-  async createChatSession(userId, sessionId = null) {
+  async createChatSession(userId) {
     if (!this.db) await this.initializeDB();
 
-    const id =
-      sessionId ||
-      `finance_session_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-    console.log(
-      `Creating or updating chat session for user ${userId} with session ID: ${id}`
-    );
+    console.log(`Creating or updating chat session for user ${userId}`);
     const existingSession = await this.db
       .collection("chat_sessions")
-      .findOne({ sessionId: id });
-    console.log(existingSession);
+      .findOne({ userId });
 
     if (!existingSession) {
       const session = {
-        sessionId: id,
-        userId: userId,
+        userId,
         createdAt: new Date(),
         lastActivity: new Date(),
         messageCount: 0,
@@ -134,20 +125,18 @@ class FinanceRAGAgent {
     } else {
       await this.db
         .collection("chat_sessions")
-        .updateOne({ sessionId: id }, { $set: { lastActivity: new Date() } });
+        .updateOne({ userId }, { $set: { lastActivity: new Date() } });
     }
-
-    return id;
   }
 
   /**
-   * Add message to chat history in MongoDB
+   * Add message to chat history in MongoDB (by userId)
    */
-  async addToHistory(sessionId, role, content, metadata = {}) {
+  async addToHistory(userId, role, content, metadata = {}) {
     if (!this.db) await this.initializeDB();
 
     const message = {
-      sessionId,
+      userId,
       role,
       content,
       timestamp: new Date(),
@@ -157,23 +146,23 @@ class FinanceRAGAgent {
     await this.db.collection("chat_messages").insertOne(message);
 
     await this.db.collection("chat_sessions").updateOne(
-      { sessionId },
+      { userId },
       {
         $inc: { messageCount: 1 },
         $set: { lastActivity: new Date() },
       }
     );
 
-    await this.cleanupOldMessages(sessionId);
+    await this.cleanupOldMessages(userId);
   }
 
   /**
-   * Get chat history from MongoDB
+   * Get chat history from MongoDB (by userId)
    */
-  async getChatHistory(sessionId, limit = null) {
+  async getChatHistory(userId, limit = null) {
     if (!this.db) await this.initializeDB();
 
-    const query = { sessionId };
+    const query = { userId };
     const options = {
       sort: { timestamp: 1 },
       limit: limit || this.maxHistoryLength,
@@ -188,19 +177,19 @@ class FinanceRAGAgent {
   }
 
   /**
-   * Clean up old messages
+   * Clean up old messages (by userId)
    */
-  async cleanupOldMessages(sessionId) {
+  async cleanupOldMessages(userId) {
     if (!this.db) return;
 
     const totalMessages = await this.db
       .collection("chat_messages")
-      .countDocuments({ sessionId });
+      .countDocuments({ userId });
 
     if (totalMessages > this.maxHistoryLength) {
       const messagesToDelete = await this.db
         .collection("chat_messages")
-        .find({ sessionId })
+        .find({ userId })
         .sort({ timestamp: 1 })
         .limit(totalMessages - this.maxHistoryLength)
         .toArray();
@@ -326,14 +315,12 @@ class FinanceRAGAgent {
    * Generate finance-specific response with RAG and chat history
    */
   async generateFinanceResponse(
-    sessionId,
     userId,
     question,
     contextDocuments,
     model = "llama3-8b-8192"
   ) {
-    // Get chat history and financial context
-    const chatHistory = await this.getChatHistory(sessionId, 10);
+    const chatHistory = await this.getChatHistory(userId, 10);
     const financialContext = await this.getFinancialContext(userId);
 
     // Prepare context from retrieved documents
@@ -364,7 +351,7 @@ You have access to:
 
 ${financialContext}
 
-Available tools (respond with EXACTLY this format when needed):
+Available tools (respond with EXACTLY this format when needed, and only one tool per user action):
 - TOOL:addExpense:{"name":"description","amount":123} - to add an expense
 - TOOL:addIncome:{"name":"description","amount":123} - to add income  
 - TOOL:getTotalExpense:{} - to get total expenses
@@ -375,14 +362,15 @@ Available tools (respond with EXACTLY this format when needed):
 - TOOL:getInvestmentSuggestions:{} - to get investment suggestions
 
 Guidelines:
-- Provide personalized financial advice based on user's transaction history
-- Use RAG context to provide accurate financial information
-- When users mention spending, ask if they want to add it as expense
-- When users mention earning, ask if they want to add it as income
-- Give specific advice based on spending patterns and categories
-- Alert about overspending in certain categories
-- Suggest budgeting and investment strategies
-- Keep responses helpful and educational
+- If the user mentions earning or receiving money, use TOOL:addIncome.
+- If the user mentions spending or paying, use TOOL:addExpense.
+- Only suggest one tool per user message unless explicitly asked for multiple actions.
+- Provide personalized financial advice based on user's transaction history.
+- Use RAG context to provide accurate financial information.
+- Give specific advice based on spending patterns and categories.
+- Alert about overspending in certain categories.
+- Suggest budgeting and investment strategies.
+- Keep responses helpful and educational.
 - Reference previous conversation context when relevant`;
 
     const userPrompt = `Previous conversation:
@@ -420,9 +408,9 @@ Provide helpful financial advice, answer the question using available context, a
   }
 
   /**
-   * Main chat method with RAG and history
+   * Main chat method with RAG and history (by userId only)
    */
-  async chatWithFinanceHistory(sessionId, userId, query, options = {}) {
+  async chatWithFinanceHistory(userId, query, options = {}) {
     const startTime = Date.now();
 
     const {
@@ -434,11 +422,11 @@ Provide helpful financial advice, answer the question using available context, a
 
     try {
       // Ensure session exists
-      await this.createChatSession(userId, sessionId);
-      console.log(`Processing finance query for session ${sessionId}:`, query);
+      await this.createChatSession(userId);
+      console.log(`Processing finance query for user ${userId}:`, query);
 
       // Add user message to history
-      await this.addToHistory(sessionId, "user", query);
+      await this.addToHistory(userId, "user", query);
 
       // Step 1: Generate embedding and search knowledge base
       console.log("Searching financial knowledge base...");
@@ -461,39 +449,41 @@ Provide helpful financial advice, answer the question using available context, a
       // Step 2: Generate contextual response
       console.log("Generating financial advice...");
       const response = await this.generateFinanceResponse(
-        sessionId,
         userId,
         query,
         contextDocuments,
         chatModel
       );
 
+      // Remove tool codes from the AI response for the user
+      const cleanedResponse = typeof response === "string"
+        ? response
+            .split('\n')
+            .filter(line => !line.trim().startsWith('TOOL:'))
+            .join('\n')
+        : response;
 
-      
-
-
-       const processingTime = Date.now() - startTime;
-        const chatHistory = await this.getChatHistory(sessionId, 10);
-        console.log(`Chat history for session ${sessionId}:`, chatHistory);
+      const processingTime = Date.now() - startTime;
+      const chatHistory = await this.getChatHistory(userId, 10);
 
       // Handle tool usage
-      if ((chatHistory.length > 0)  &&  response.includes("TOOL:")) 
-        {
+      if (chatHistory.length > 1 && response.includes("TOOL:")) {
         const toolResult = await this.handleFinanceTools(response, userId);
 
-        // Add tool result to history
-        await this.addToHistory(sessionId, "assistant", toolResult, {
+        // Add tool result to history (internal, not user-facing)
+        await this.addToHistory(userId, "assistant", toolResult, {
           type: "tool_response",
           documentsFound: contextDocuments.length,
           processingTime: processingTime,
         });
 
+        // Return only the cleaned response to the user
         return {
-          sessionId: sessionId,
-          query: query,
+          userId,
+          query,
           type: "tool_response",
-          response: toolResult,
-          contextDocuments: contextDocuments,
+          response: cleanedResponse, // <--- always cleaned!
+          contextDocuments,
           metadata: {
             documentsFound: contextDocuments.length,
             processingTime: processingTime,
@@ -501,18 +491,18 @@ Provide helpful financial advice, answer the question using available context, a
         };
       } else {
         // Add response to history
-        await this.addToHistory(sessionId, "assistant", response, {
+        await this.addToHistory(userId, "assistant", cleanedResponse, {
           type: "advice",
           documentsFound: contextDocuments.length,
           processingTime: processingTime,
         });
 
         return {
-          sessionId: sessionId,
-          query: query,
+          userId,
+          query,
           type: "advice",
-          response: response,
-          contextDocuments: contextDocuments,
+          response: cleanedResponse, // <--- always cleaned!
+          contextDocuments,
           metadata: {
             documentsFound: contextDocuments.length,
             processingTime: processingTime,
@@ -523,7 +513,7 @@ Provide helpful financial advice, answer the question using available context, a
       console.error("Error in finance chat session:", error);
 
       // Add error to history
-      await this.addToHistory(sessionId, "system", `Error: ${error.message}`, {
+      await this.addToHistory(userId, "system", `Error: ${error.message}`, {
         type: "error",
         error: error.message,
       });
@@ -536,36 +526,36 @@ Provide helpful financial advice, answer the question using available context, a
    * Handle finance tools
    */
   async handleFinanceTools(response, userId) {
-    const toolMatch = response.match(/TOOL:(\w+):({.*?})/);
-    if (!toolMatch) return response;
+    const toolMatches = response.matchAll(/TOOL:(\w+):({.*?})/g);
+    for (const match of toolMatches) {
+      const [, toolName, toolParams] = match;
 
-    const [, toolName, toolParams] = toolMatch;
+      try {
+        const params = JSON.parse(toolParams);
 
-    try {
-      const params = JSON.parse(toolParams);
-
-      switch (toolName) {
-        case "addExpense":
-          return await this.addExpense(userId, params);
-        case "addIncome":
-          return await this.addIncome(userId, params);
-        case "getTotalExpense":
-          return await this.getTotalExpense(userId);
-        case "getBalance":
-          return await this.getBalance(userId);
-        case "getExpensesByCategory":
-          return await this.getExpensesByCategory(userId);
-        case "getRecentTransactions":
-          return await this.getRecentTransactions(userId);
-        case "getBudgetAdvice":
-          return await this.getBudgetAdvice(userId);
-        case "getInvestmentSuggestions":
-          return await this.getInvestmentSuggestions(userId);
-        default:
-          return `Unknown tool: ${toolName}`;
+        switch (toolName) {
+          case "addExpense":
+            return await this.addExpense(userId, params);
+          case "addIncome":
+            return await this.addIncome(userId, params);
+          case "getTotalExpense":
+            return await this.getTotalExpense(userId);
+          case "getBalance":
+            return await this.getBalance(userId);
+          case "getExpensesByCategory":
+            return await this.getExpensesByCategory(userId);
+          case "getRecentTransactions":
+            return await this.getRecentTransactions(userId);
+          case "getBudgetAdvice":
+            return await this.getBudgetAdvice(userId);
+          case "getInvestmentSuggestions":
+            return await this.getInvestmentSuggestions(userId);
+          default:
+            return `Unknown tool: ${toolName}`;
+        }
+      } catch (error) {
+        return `Error using tool: ${error.message}`;
       }
-    } catch (error) {
-      return `Error using tool: ${error.message}`;
     }
   }
 
@@ -733,9 +723,7 @@ Provide helpful financial advice, answer the question using available context, a
         points: points,
       });
 
-      console.log(
-        `Added ${points.length} financial documents to collection ${this.collectionName}`
-      );
+     
     } catch (error) {
       console.error("Error adding financial documents:", error);
       throw error;
