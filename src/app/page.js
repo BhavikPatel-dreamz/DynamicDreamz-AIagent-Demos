@@ -4,10 +4,12 @@ const pages = [
   {
     title: "Personal Finance Assistant",
     path: "/finance",
+    description: "A personal finance assistant that helps you manage your finances effectively.",
   },
   {
     title: "Resume AI Search Boost (HR Assistant)",
     path: "/resume-ai-search-boost",
+    description: "An AI-powered tool to enhance your resume and boost your job search.",
   },
   // Add more pages here as needed
 ];
