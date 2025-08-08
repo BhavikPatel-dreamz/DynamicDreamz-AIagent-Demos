@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import  FinanceRAGAgent  from "../../../../src/agent/FinanceRAGAgent"; // Adjust the import path as necessary
 import type { NextRequest } from "next/server";
 import { cookies } from 'next/headers';
+import { PRERENDER_REVALIDATE_ONLY_GENERATED_HEADER } from "next/dist/lib/constants";
+import { get } from "https";
 
 // You may want to initialize your agent once (singleton)
 
@@ -24,11 +26,16 @@ export async function POST(request: NextRequest) {
       return (await cookieStore).get('trackingSessionId')?.value;
     }
 
-  const userId = getTrackingSessionId() || generateUUID();
-  if (!getTrackingSessionId()) {
-    setTrackingSessionId();
+    // get from current ip
+  const userId = request.headers.get('x-user-id') || null; // Replace with your method of getting user ID
+  if (!userId) {
+    await setTrackingSessionId();
+  } else {
+    const existingSessionId = await getTrackingSessionId();
+    if (!existingSessionId) {
+      await setTrackingSessionId();
+    }
   }
-
 
   if (!message || !userId) {
     return NextResponse.json(
