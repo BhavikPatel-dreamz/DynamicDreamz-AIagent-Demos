@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown';
 
 
 const page = () => {
@@ -302,11 +303,24 @@ const page = () => {
                                         whiteSpace: 'pre-wrap'
                                     }}>
                                         {msg.typing ? (
-                                            <span style={{ fontStyle: 'italic', color: '#6c757d' }}>
-                                                Assistant is typing{'.'.repeat(dots)}
+                                          <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            color: '#6c757d',
+                                            fontStyle: 'italic'
+                                          }}>
+                                            <span>
+                                              <svg width="18" height="18" viewBox="0 0 24 24" fill="#007bff" style={{marginRight: '4px'}}>
+                                                <circle cx="5" cy="12" r="2" />
+                                                <circle cx="12" cy="12" r="2" />
+                                                <circle cx="19" cy="12" r="2" />
+                                              </svg>
                                             </span>
+                                            Assistant is typing{' '.repeat(dots)}
+                                          </div>
                                         ) : (
-                                            msg.text
+                                            <ReactMarkdown>{msg.text}</ReactMarkdown>
                                         )}
                                     </div>
                                 </div>
