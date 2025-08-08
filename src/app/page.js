@@ -32,7 +32,7 @@ export default function Home() {
                 </Link>
               </td>
               <td className="px-6 py-4 font-mono text-sm text-gray-500 dark:text-gray-400">
-                {page.path}
+                {page.description || "No description available"}
               </td>
             </tr>
           ))}
