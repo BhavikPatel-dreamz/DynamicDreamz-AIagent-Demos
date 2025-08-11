@@ -9,6 +9,9 @@
     "start": "next start -p 3000 ",
     "lint": "next lint"
   },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@prisma/client": "^6.13.0",
@@ -48,11 +51,16 @@
     "date-fns": "^3.6.0",
     "dotenv": "^17.2.1",
     "embla-carousel-react": "^8.6.0",
+    "formidable": "^3.5.4",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.536.0",
     "mongodb": "^6.18.0",
     "next": "15.4.6",
     "next-themes": "^0.3.0",
+    "pdf-parse": "^1.1.1",
+    "pdf2json": "^3.2.0",
+    "pdfjs-dist": "^5.4.54",
+    "prisma": "^6.13.0",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",

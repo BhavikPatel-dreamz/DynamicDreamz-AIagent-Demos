@@ -1,9 +1,9 @@
 
 import { ConversationContext, ConversationTurn } from '../../src/types';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+// const openai = new OpenAI({
+//   apiKey: process.env.OPENAI_API_KEY!,
+// });
 
 export class AIConversationEngine {
   private context: ConversationContext;
@@ -56,17 +56,17 @@ export class AIConversationEngine {
       // });
 
 
-      const aiResponse = completion.choices[0]?.message?.content || 
-        "I apologize, but I didn't understand that. Could you please repeat?";
+      // const aiResponse = completion.choices[0]?.message?.content || 
+      //   "I apologize, but I didn't understand that. Could you please repeat?";
 
-      // Add AI response to history
-      this.context.conversationHistory.push({
-        speaker: 'ai',
-        message: aiResponse,
-        timestamp: new Date()
-      });
+      // // Add AI response to history
+      // this.context.conversationHistory.push({
+      //   speaker: 'ai',
+      //   message: aiResponse,
+      //   timestamp: new Date()
+      // });
 
-      return aiResponse;
+      return "This is a placeholder response. Replace with actual AI response generation logic.";
     } catch (error) {
       console.error('AI response generation failed:', error);
       return "I'm experiencing technical difficulties. Let me transfer you to a human agent.";
