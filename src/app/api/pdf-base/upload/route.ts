@@ -3,10 +3,7 @@ import type { NextRequest } from "next/server";
 import PDFRAGAgent from "../../../../agent/PDFRAGAgent.js";
 
 
-const PDFAgent = new PDFRAGAgent({
-  mongoDbName: 'PDF_assistant',
-  maxHistoryLength: 20
-});
+
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -21,6 +18,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const PDFAgent = new PDFRAGAgent({
+        mongoDbName: 'PDF_assistant',
+        maxHistoryLength: 20
+    });
   
     const result = await PDFAgent.uploadPdf(userId, pdf);
     

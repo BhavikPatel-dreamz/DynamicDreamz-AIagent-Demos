@@ -127,7 +127,7 @@ class PDFRAGAgent {
 
       const points = [
         {
-          id: `${userId}`, 
+          
           vector: embeddingData,
           payload: {
             userId,

@@ -1,4 +1,5 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Qdrant Vector Database Client
@@ -77,11 +78,12 @@ class QdrantManager {
     async addDocuments(collectionName, documents) {
         try {
             const points = documents.map(doc => ({
-                id: doc.id || Math.random().toString(36).substr(2, 9),
+                id: doc.id || uuidv4(), // Generate a new UUID if no ID is provided
                 vector: doc.vector,
                 payload: doc.payload || {}
             }));
 
+           
             const result = await this.client.upsert(collectionName, {
                 wait: true,
                 points: points
