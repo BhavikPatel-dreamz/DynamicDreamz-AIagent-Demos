@@ -183,7 +183,7 @@ class QdrantManager {
         const result = await this.client.scroll(collectionName, {
             filter: {
                 must: [
-                    { key: "userId", match: { value: userId } }
+                    { key: "userId", match: { value: `${userId}` }}
                 ]
             },
             with_payload: true,
