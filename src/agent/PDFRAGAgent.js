@@ -102,8 +102,8 @@ class PDFRAGAgent {
         }
       ];
 
-     const  rest= await this.qdrantManager.addDocuments('pdf-base', points);
-      console.log(rest)
+      await this.qdrantManager.addDocuments('pdf-base', points);
+
       return {
         success: true,
         message: "PDF uploaded successfully",
@@ -116,33 +116,33 @@ class PDFRAGAgent {
     }
   }
 
-async chatMessage(userId, query) {
+  async chatMessage(userId, query) {
     console.log(`🔍 Search request for userId: ${userId}`);
-    
+
     // Qdrant filter format
     const userFilter = {
-        must: [
-            {
-                key: 'userId',
-                match: { value: userId }
-            }
-        ]
+      must: [
+        {
+          key: 'userId',
+          match: { value: userId }
+        }
+      ]
     };
     // Generate embeddings
     let embeddingData = await this.jina.embedText(query, "jina-embeddings-v2-base-en");
-    
+
     // Search
     const searchResults = await this.qdrantManager.search('pdf-base', embeddingData, {
-        filter: userFilter
+      filter: userFilter
     });
 
     return {
-        success: true,
-        userId,
-        searchResultsReturned: searchResults.length,
-        results: searchResults
+      success: true,
+      userId,
+      searchResultsReturned: searchResults.length,
+      results: searchResults
     };
-}
+  }
 }
 
 
