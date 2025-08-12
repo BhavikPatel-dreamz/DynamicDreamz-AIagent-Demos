@@ -1,4 +1,3 @@
-import MongoManager from "../Clients/MongoManager.js";
 import GroqClient from "../Clients/GroqClient.js";
 import QdrantManager from "../Clients/QdrantManager.js";
 import JinaClient from "../Clients/JinaClient.js"
@@ -19,16 +18,14 @@ class PDFRAGAgent {
       jinaApiKey = process.env.JINA_API_KEY,
       groqApiKey = process.env.GROQ_API_KEY,
       collectionName = 'pdf-base',
-      mongoUrl = 'mongodb://localhost:27017',
-      mongoDbName = "PDF_assistant",
       maxHistoryLength = 20,
     } = config;
 
     // Initialize Qdrant client
     this.qdrantManager = new QdrantManager({
-            url: qdrantUrl,
-            apiKey: qdrantApiKey
-        });
+      url: qdrantUrl,
+      apiKey: qdrantApiKey
+    });
     this.jina = new JinaClient(jinaApiKey);
     // this.jinaApiKey = jinaApiKey;
     this.groqApiKey = groqApiKey;
@@ -36,34 +33,14 @@ class PDFRAGAgent {
     this.maxHistoryLength = maxHistoryLength;
 
     // MongoDB configuration
-    this.mongoUrl = mongoUrl;
-    this.mongoDbName = mongoDbName;
-    this.mongoClient = null;
-    this.db = null;
     this.groqClient = new GroqClient();
-    this.dbPromise = new MongoManager({ dbName: mongoDbName }).connect();
     this.jinaEmbedUrl = 'https://api.jina.ai/v1/embeddings';
     this.groqChatUrl = 'https://api.groq.com/openai/v1/chat/completions';
   }
 
-  async initializeDB() {
-    if (!this.db) {
-      try {
-        this.db = await this.dbPromise;
-        console.log("Database connection established");
-        const collections = await this.db.listCollections().toArray();
-        console.log("Available collections:", collections.map(c => c.name));
-      } catch (error) {
-        console.error("Error initializing database:", error);
-        throw error;
-      }
-    }
-  }
-
-
   async uploadPdf(userId, file) {
     try {
-      await this.initializeDB();
+      // await this.initializeDB();
       const uploadStatus = new Map();
 
       const updateStatus = (userId, status, progress = 0, message = "", data = null) => {
@@ -110,24 +87,12 @@ class PDFRAGAgent {
         const pageText = textContent.items.map((item) => item.str).join(" ");
         fullText += pageText + "\n";
       }
- 
-      let embeddingData = await this.jina.embedText(fullText, "jina-embeddings-v2-base-en");
-     
 
-    // Save in MongoDB
-      const pdfRecord = await this.db.collection("pdf-base").insertOne({
-        filename: file.name,
-        originalname: file.name,
-        size: file.size,
-        mimetype: file.type,
-        createdAt: new Date(),
-        userId,
-        pdfText: fullText
-      });
+      let embeddingData = await this.jina.embedText(fullText, "jina-embeddings-v2-base-en");
 
       const points = [
         {
-          
+
           vector: embeddingData,
           payload: {
             userId,
@@ -136,14 +101,12 @@ class PDFRAGAgent {
           }
         }
       ];
-     
-      await this.qdrantManager.addDocuments('pdf-base', points);
-     
+
+     const  rest= await this.qdrantManager.addDocuments('pdf-base', points);
+      console.log(rest)
       return {
         success: true,
         message: "PDF uploaded successfully",
-        documentId: pdfRecord.insertedId,
-        fileUrl: publicUrl,
         userId
       };
 
@@ -153,6 +116,33 @@ class PDFRAGAgent {
     }
   }
 
+async chatMessage(userId, query) {
+    console.log(`🔍 Search request for userId: ${userId}`);
+    
+    // Qdrant filter format
+    const userFilter = {
+        must: [
+            {
+                key: 'userId',
+                match: { value: userId }
+            }
+        ]
+    };
+    // Generate embeddings
+    let embeddingData = await this.jina.embedText(query, "jina-embeddings-v2-base-en");
+    
+    // Search
+    const searchResults = await this.qdrantManager.search('pdf-base', embeddingData, {
+        filter: userFilter
+    });
+
+    return {
+        success: true,
+        userId,
+        searchResultsReturned: searchResults.length,
+        results: searchResults
+    };
+}
 }
 
 
