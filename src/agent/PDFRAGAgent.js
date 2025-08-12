@@ -13,20 +13,15 @@ class PDFRAGAgent {
 
   constructor(config) {
     const {
-      qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333',
-      qdrantApiKey = process.env.QDRANT_API_KEY,
-      jinaApiKey = process.env.JINA_API_KEY,
+  
       groqApiKey = process.env.GROQ_API_KEY,
       collectionName = 'pdf-base',
       maxHistoryLength = 20,
     } = config;
 
     // Initialize Qdrant client
-    this.qdrantManager = new QdrantManager({
-      url: qdrantUrl,
-      apiKey: qdrantApiKey
-    });
-    this.jina = new JinaClient(jinaApiKey);
+    this.qdrantManager = new QdrantManager();
+    this.jina = new JinaClient();
     // this.jinaApiKey = jinaApiKey;
     this.groqApiKey = groqApiKey;
     this.collectionName = collectionName;
@@ -34,8 +29,7 @@ class PDFRAGAgent {
 
     // MongoDB configuration
     this.groqClient = new GroqClient();
-    this.jinaEmbedUrl = 'https://api.jina.ai/v1/embeddings';
-    this.groqChatUrl = 'https://api.groq.com/openai/v1/chat/completions';
+  
   }
 
   async uploadPdf(userId, file) {
@@ -119,22 +113,10 @@ class PDFRAGAgent {
   async chatMessage(userId, query) {
     console.log(`🔍 Search request for userId: ${userId}`);
 
-    // Qdrant filter format
-    const userFilter = {
-      must: [
-        {
-          key: 'userId',
-          match: { value: userId }
-        }
-      ]
-    };
     // Generate embeddings
     let embeddingData = await this.jina.embedText(query, "jina-embeddings-v2-base-en");
-
-    // Search
-    const searchResults = await this.qdrantManager.search('pdf-base', embeddingData, {
-      filter: userFilter
-    });
+   // Search
+    const searchResults = await this.qdrantManager.searchByUserID('pdf-base', embeddingData,userId );
 
     return {
       success: true,
