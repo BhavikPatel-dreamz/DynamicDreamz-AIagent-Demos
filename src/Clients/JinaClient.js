@@ -31,7 +31,7 @@ class JinaClient {
     async embed(input, options = {}) {
         const {
             model = this.defaultModel,
-            encoding_format = 'float'
+          //  encoding_format = 'float'
         } = options;
 
         const headers = {
@@ -42,7 +42,7 @@ class JinaClient {
         const payload = {
             model: model,
             input: Array.isArray(input) ? input : [input],
-            encoding_format: encoding_format
+           // encoding_format: encoding_format
         };
 
         try {
