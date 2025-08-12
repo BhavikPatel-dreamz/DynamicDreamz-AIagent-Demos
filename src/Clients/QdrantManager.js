@@ -202,7 +202,6 @@ class QdrantManager {
     }
 
     console.log(`🔍 Searching collection ${collectionName} for userID: ${userID}`)
-    console.log(`Query vector: ${JSON.stringify(queryVector)}`)
     console.log(`Filter: ${JSON.stringify(filter)}`);
     
     return this.search(collectionName, queryVector, {
