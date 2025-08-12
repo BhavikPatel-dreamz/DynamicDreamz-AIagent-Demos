@@ -131,7 +131,7 @@ async uploadPdf(userId, files) {
  async getPdfList(userId) {
   try {
     
-    const response = await this.qdrantManager.getDocumentsByUserId('pdf-base',userId);
+    const response = await this.qdrantManager.getDocumentsByUserID('pdf-base',userId);
 
     return {
       success: true,
