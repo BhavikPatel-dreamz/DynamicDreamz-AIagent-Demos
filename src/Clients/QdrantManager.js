@@ -83,7 +83,7 @@ class QdrantManager {
                 payload: doc.payload || {}
             }));
 
-           
+
             const result = await this.client.upsert(collectionName, {
                 wait: true,
                 points: points
@@ -104,30 +104,29 @@ class QdrantManager {
      * @param {Object} options - Search options
      * @returns {Promise<Array>} Search results
      */
-    async search(collectionName, queryVector, options = {}) {
+    async search(collectionName, options = {}) {
         const {
             limit = 5,
             scoreThreshold = 0.6,
             withPayload = true,
             withVector = false,
-            filter = null
+            filter
         } = options;
 
         try {
-            const searchResult = await this.client.search(collectionName, {
+            const searchResult = await this.client.scroll(collectionName, {
                 vector: queryVector,
                 limit: limit,
                 score_threshold: scoreThreshold,
                 with_payload: withPayload,
                 with_vector: withVector,
-                filter: filter
+                filter
             });
-
+            console
             return searchResult.map(result => ({
                 id: result.id,
                 score: result.score,
                 payload: result.payload || {},
-                vector: result.vector || null
             }));
         } catch (error) {
             console.error('Error searching collection:', error);
@@ -179,6 +178,25 @@ class QdrantManager {
             throw error;
         }
     }
+   async getDocumentsByUserId(collectionName, userId) {
+    try {
+        const result = await this.client.scroll(collectionName, {
+            filter: {
+                must: [
+                    { key: "userId", match: { value: userId } }
+                ]
+            },
+            with_payload: true,
+            with_vector: false,
+            limit: 100
+        });
+        return result; // Qdrant returns { points: [...], next_page_offset: ... }
+    } catch (error) {
+        console.error(`Error getting documents for userId ${userId}:`, error);
+        throw error;
+    }
+}
+
 }
 
 export default QdrantManager;
