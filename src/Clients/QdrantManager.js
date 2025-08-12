@@ -97,7 +97,7 @@ class QdrantManager {
                 payload: doc.payload || {}
             }));
 
-           
+
             const result = await this.client.upsert(collectionName, {
                 wait: true,
                 points: points

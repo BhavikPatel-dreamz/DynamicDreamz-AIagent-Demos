@@ -32,34 +32,35 @@ class PDFRAGAgent {
   
   }
 
-  async uploadPdf(userId, file) {
-    try {
-      // await this.initializeDB();
-      const uploadStatus = new Map();
-
-      const updateStatus = (userId, status, progress = 0, message = "", data = null) => {
-        const statusObj = {
-          status,
-          progress,
-          message,
-          data,
-          timestamp: new Date()
-        };
-        uploadStatus.set(userId, statusObj);
-        console.log(`Status Update [${userId}]: ${status} - ${progress}% - ${message}`);
+async uploadPdf(userId, files) {
+  try {
+    const uploadStatus = new Map();
+    const updateStatus = (uid, status, progress = 0, message = "", data = null) => {
+      const statusObj = {
+        status,
+        progress,
+        message,
+        data,
+        timestamp: new Date()
       };
+      uploadStatus.set(uid, statusObj);
+      console.log(`Status Update [${uid}]: ${status} - ${progress}% - ${message}`);
+    };
 
+    // Convert single file to array
+    const fileList = Array.isArray(files) ? files : [files];
+    const results = [];
+
+    for (const file of fileList) {
       // 1️⃣ Validate file
       if (!file) {
         updateStatus(userId, "error", 0, "No file uploaded");
         throw new Error("No file uploaded");
       }
-
       if (file.type !== "application/pdf") {
         updateStatus(userId, "error", 0, "Invalid file type. Only PDFs are allowed");
         throw new Error("Invalid file type. Only PDFs are allowed");
       }
-
       if (file.size === 0) {
         updateStatus(userId, "error", 0, "Uploaded file is empty");
         throw new Error("Uploaded file is empty");
@@ -69,7 +70,7 @@ class PDFRAGAgent {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      // 5️⃣ Extract text using pdfjs-dist
+      // 3️⃣ Extract text using pdfjs-dist
       const uint8Array = new Uint8Array(buffer);
       const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
       const pdfDoc = await loadingTask.promise;
@@ -82,33 +83,35 @@ class PDFRAGAgent {
         fullText += pageText + "\n";
       }
 
-      let embeddingData = await this.jina.embedText(fullText, "jina-embeddings-v2-base-en");
+      // 4️⃣ Get embeddings
+      const embeddingData = await this.jina.embedText(fullText, "jina-embeddings-v2-base-en");
 
-      const points = [
-        {
-
-          vector: embeddingData,
-          payload: {
-            userId,
-            filename: file.name,
-            text: fullText
-          }
+      const points = [{
+        vector: embeddingData,
+        payload: {
+          userId,
+          filename: file.name,
+          text: fullText
         }
-      ];
+      }];
 
       await this.qdrantManager.addDocuments('pdf-base', points);
 
-      return {
+      results.push({
         success: true,
-        message: "PDF uploaded successfully",
+        message: `${file.name} uploaded successfully`,
+        filename: file.name,
         userId
-      };
-
-    } catch (error) {
-      console.error("Upload error:", error);
-      throw error;
+      });
     }
+
+    return results.length === 1 ? results[0] : results;
+
+  } catch (error) {
+    console.error("Upload error:", error);
+    throw error;
   }
+}
 
   async chatMessage(userId, query) {
     console.log(`🔍 Search request for userId: ${userId}`);
@@ -125,6 +128,21 @@ class PDFRAGAgent {
       results: searchResults
     };
   }
+ async getPdfList(userId) {
+  try {
+    
+    const response = await this.qdrantManager.getDocumentsByUserId('pdf-base',userId);
+
+    return {
+      success: true,
+      response
+    };
+  } catch (error) {
+    console.error("Error fetching PDF list:", error);
+    throw new Error("Failed to fetch PDF list");
+  }
+}
+
 }
 
 
