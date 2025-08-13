@@ -233,138 +233,189 @@ class PDFRAGAgent {
       .join("\n\n");
   }
 
+ /**
+   * Enhanced chat message processing
+   */
   async chatMessage(userId, query, conversationId = null) {
+    const startTime = Date.now();
+    
     try {
+      await this.initializeDB();
       console.log(`🔍 Processing query for userId: ${userId}`);
 
-      // 1️⃣ Get chat history
-      const chatHistory = await this.getChatHistory(
-        userId,
-        conversationId,
-        this.maxHistoryLength
-      );
-      const formattedHistory = this.formatChatHistory(chatHistory);
+      // Validate inputs
+      if (!userId || !query?.trim()) {
+        throw new Error('Invalid userId or empty query');
+      }
 
-      // 2️⃣ Generate embeddings for the query
-      const embeddingData = await this.jina.embedText(
-        query,
-        "jina-embeddings-v2-base-en"
-      );
+      const trimmedQuery = query.trim();
+
+      // Generate conversation ID if not provided
+      if (!conversationId) {
+        conversationId = `conv_${userId}_${Date.now()}`;
+      }
+
+      // 1️⃣ Get chat history
+      let chatHistory = [];
+      try {
+        chatHistory = await this.getChatHistory(userId, conversationId, this.maxHistoryLength);
+      } catch (error) {
+        console.warn('⚠️ Failed to retrieve chat history:', error.message);
+      }
+
+      const formattedHistory = chatHistory.length > 0 
+        ? this.formatChatHistory(chatHistory) 
+        : '';
+
+      // 2️⃣ Generate embeddings
+      let embeddingData;
+      try {
+        embeddingData = await this.jina.embedText(
+          trimmedQuery,
+          "jina-embeddings-v2-base-en"
+        );
+        
+        if (!embeddingData || !Array.isArray(embeddingData)) {
+          throw new Error('Invalid embedding response');
+        }
+      } catch (error) {
+        console.error('❌ Embedding generation failed:', error);
+        throw new Error('Failed to process query - please try again');
+      }
 
       // 3️⃣ Search relevant documents
-      const searchResults = await this.qdrantManager.searchByUserID(
-        this.collectionName,
-        embeddingData,
-        userId,
-        10 // Get top 10 results
-      );
+      let searchResults = [];
+      try {
+        searchResults = await this.qdrantManager.searchByUserID(
+          this.collectionName,
+          embeddingData,
+          userId,
+          10
+        );
+        
+        if (!Array.isArray(searchResults)) {
+          throw new Error('Invalid search results format');
+        }
+      } catch (error) {
+        console.error('❌ Document search failed:', error);
+        throw new Error('Failed to search documents - please try again');
+      }
 
-      // 4️⃣ Filter results by similarity threshold
+      // 4️⃣ Filter and validate results
       const relevantResults = searchResults.filter(
-        (result) => result.score >= this.similarityThreshold
+        (result) => {
+          if (!result?.payload?.text || typeof result.score !== 'number') {
+            console.warn('⚠️ Invalid search result structure:', result);
+            return false;
+          }
+          return result.score >= this.similarityThreshold;
+        }
       );
 
+      // Handle no results case
       if (relevantResults.length === 0) {
-        const noResultsResponse =
-          "I couldn't find relevant information in your uploaded PDFs to answer this question. Could you try rephrasing your question or upload more relevant documents?";
+        const noResultsResponse = searchResults.length === 0
+          ? "I couldn't find any documents in your collection. Please upload some PDF documents first to get started."
+          : "I couldn't find relevant information in your uploaded PDFs to answer this question. Could you try rephrasing your question or upload more relevant documents?";
 
         // Save to chat history
         if (conversationId) {
-          await this.saveChatMessage(
-            userId,
-            conversationId,
-            query,
-            noResultsResponse,
-            []
-          );
+          this.saveChatMessage(userId, conversationId, trimmedQuery, noResultsResponse, [])
+            .catch(error => console.warn('⚠️ Failed to save no-results message:', error));
         }
 
         return {
           success: true,
           userId,
-          query,
+          conversationId,
+          query: trimmedQuery,
           answer: noResultsResponse,
           searchResultsCount: 0,
           sources: [],
+          relevantChunks: [],
+          processingTime: Date.now() - startTime
         };
       }
 
       // 5️⃣ Build context from relevant chunks
-      let context = "";
-      let currentLength = 0;
-      const usedSources = new Set();
+      const contextData = this.buildContext(relevantResults);
 
-      for (const result of relevantResults) {
-        const chunkText = result.payload.text;
-        if (currentLength + chunkText.length <= this.maxContextLength) {
-          context += `Source: ${result.payload.filename} (Chunk ${result.payload.chunkIndex + 1
-            })\n${chunkText}\n\n`;
-          currentLength += chunkText.length;
-          usedSources.add(result.payload.filename);
-        } else {
-          break;
+      if (!contextData.context.trim()) {
+        const fallbackResponse = "I found some potentially relevant documents, but couldn't extract readable content from them. Please check if your PDFs are text-searchable.";
+        
+        if (conversationId) {
+          this.saveChatMessage(userId, conversationId, trimmedQuery, fallbackResponse, [])
+            .catch(error => console.warn('⚠️ Failed to save fallback message:', error));
         }
-      }
 
-      // 6️⃣ Build prompt for Groq
-      const systemPrompt = `You are a helpful AI assistant that answers questions based on the provided PDF documents. 
-      
-      Instructions:
-      - Answer the user's question using ONLY the information provided in the context
-      - If the context doesn't contain enough information to answer the question, say so clearly
-      - Always cite the source documents when providing information
-      - Be concise and accurate
-      - If there's conflicting information in different sources, mention this
-      
-      Context from PDF documents:
-      ${context}
-      
-      ${formattedHistory
-          ? `Previous conversation history:\n${formattedHistory}\n\n`
-          : ""
-        }`;
-
-      const userPrompt = `Question: ${query}`;
-
-      // 7️⃣ Generate answer using Groq
-      const groqResponse = await this.groqClient.chat([
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ]);
-
-      const answer =
-        groqResponse ||
-        "I apologize, but I couldn't generate a response. Please try again.";
-
-      // 8️⃣ Save to chat history
-      if (conversationId) {
-        await this.saveChatMessage(
+        return {
+          success: true,
           userId,
           conversationId,
-          query,
-          answer,
-          relevantResults
-        );
+          query: trimmedQuery,
+          answer: fallbackResponse,
+          searchResultsCount: 0,
+          sources: [],
+          relevantChunks: [],
+          processingTime: Date.now() - startTime
+        };
       }
 
-      // 9️⃣ Return response
+      // 6️⃣ Generate AI response
+      const answer = await this.generateAIResponse(contextData.context, trimmedQuery, formattedHistory);
+
+      // 7️⃣ Save to chat history
+      if (conversationId) {
+        this.saveChatMessage(userId, conversationId, trimmedQuery, answer, relevantResults)
+          .catch(error => console.warn('⚠️ Failed to save chat message:', error));
+      }
+
+      // 8️⃣ Return response
       return {
         success: true,
         userId,
-        query,
+        conversationId,
+        query: trimmedQuery,
         answer,
         searchResultsCount: relevantResults.length,
-        sources: Array.from(usedSources),
-        relevantChunks: relevantResults.map((r) => ({
-          filename: r.payload.filename,
-          chunkIndex: r.payload.chunkIndex + 1,
-          score: r.score,
-          preview: r.payload.text.substring(0, 150) + "...",
-        })),
+        sources: Array.from(contextData.usedSources),
+        relevantChunks: contextData.processedChunks,
+        contextLength: contextData.contextLength,
+        processingTime: Date.now() - startTime
       };
+
     } catch (error) {
-      console.error("Chat message error:", error);
-      throw new Error(`Failed to process chat message: ${error.message}`);
+      console.error("❌ Chat message error:", error);
+      
+      const errorResponse = {
+        success: false,
+        userId: userId || 'unknown',
+        conversationId: conversationId || null,
+        query: query || '',
+        answer: "I'm sorry, but I encountered an error while processing your request. Please try again.",
+        searchResultsCount: 0,
+        sources: [],
+        relevantChunks: [],
+        error: error.message,
+        processingTime: Date.now() - startTime
+      };
+
+      // Try to save error to chat history
+      if (conversationId && userId) {
+        try {
+          await this.saveChatMessage(
+            userId,
+            conversationId,
+            query || 'Error occurred',
+            errorResponse.answer,
+            []
+          );
+        } catch (saveError) {
+          console.warn('⚠️ Failed to save error message:', saveError);
+        }
+      }
+
+      return errorResponse;
     }
   }
 
@@ -460,6 +511,96 @@ class PDFRAGAgent {
     } catch (error) {
       console.error("Search error:", error);
       throw new Error(`Search failed: ${error.message}`);
+    }
+  }
+   /**
+   * Build context from search results
+   */
+  buildContext(relevantResults) {
+    let context = "";
+    let currentLength = 0;
+    const usedSources = new Set();
+    const processedChunks = [];
+
+    for (const result of relevantResults) {
+      try {
+        const chunkText = result.payload.text?.toString() || '';
+        const filename = result.payload.filename || 'Unknown';
+        const chunkIndex = (result.payload.chunkIndex ?? -1) + 1;
+        
+        if (chunkText && currentLength + chunkText.length <= this.maxContextLength) {
+          const contextEntry = `Source: ${filename} (Chunk ${chunkIndex})\n${chunkText}\n\n`;
+          context += contextEntry;
+          currentLength += chunkText.length;
+          usedSources.add(filename);
+          
+          processedChunks.push({
+            filename,
+            chunkIndex,
+            score: result.score,
+            preview: chunkText.substring(0, 150) + (chunkText.length > 150 ? "..." : "")
+          });
+        } else if (!chunkText) {
+          console.warn('⚠️ Empty chunk text in result:', result);
+        } else {
+          break; // Context length exceeded
+        }
+      } catch (error) {
+        console.warn('⚠️ Error processing search result:', error, result);
+        continue;
+      }
+    }
+
+    return {
+      context,
+      contextLength: currentLength,
+      usedSources,
+      processedChunks
+    };
+  }
+  /**
+   * Generate AI response using Groq
+   */
+  async generateAIResponse(context, query, chatHistory) {
+    try {
+      const systemPrompt = `You are a helpful AI assistant that answers questions based on provided PDF documents.
+
+Instructions:
+- Answer using ONLY the information from the provided context
+- If the context lacks sufficient information, state this clearly
+- Always cite source documents when providing information
+- Be concise, accurate, and well-structured
+- If sources conflict, acknowledge the discrepancy
+- Use bullet points or numbered lists for clarity when appropriate
+- Be conversational and helpful in your tone
+
+Context from PDF documents:
+${context}${chatHistory ? `\n\nPrevious conversation:\n${chatHistory}` : ''}`;
+
+      const userPrompt = `Question: ${query}`;
+
+      const groqResponse = await this.groqClient.chat([
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ]);
+
+      let answer = groqResponse?.trim();
+      
+      if (!answer) {
+        throw new Error('Empty response from AI service');
+      }
+      
+      // Validate response length
+      if (answer.length > 10000) {
+        console.warn('⚠️ Response unusually long, truncating');
+        answer = answer.substring(0, 10000) + '\n\n[Response truncated due to length]';
+      }
+      
+      return answer;
+      
+    } catch (error) {
+      console.error('❌ AI response generation failed:', error);
+      return "I apologize, but I'm having trouble generating a response right now. Please try again in a moment, or rephrase your question.";
     }
   }
 }
