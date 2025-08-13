@@ -6,22 +6,22 @@ const pages = [
     path: "/finance",
     description: "A personal finance assistant that helps you manage your finances effectively.",
     tech: "Next.js, React, Node.js, MongoDB",
-    Ai: "OpenAI, ChatGPT",
+    Ai: "OpenAI, openai/gpt-oss-120b",
   },
   {
     title: "Resume AI Search Boost (HR Assistant)",
     path: "/resume-ai-search-boost",
     description: "An AI-powered tool to enhance your resume and boost your job search.",
     tech: "Next.js, React, Node.js, MongoDB",
-    Ai: "OpenAI, ChatGPT",
+    Ai: "OpenAI, meta-llama/llama-prompt-guard-2-22m",
 
   },
   {
     title: "PDF Based Chat Support",
     path: "/pdf-Management",
     description: "An AI-powered tool to enhance your resume and boost your job search.",
-    tech: "Next.js, React, Node.js, MongoDB",
-    Ai: "OpenAI, ChatGPT",
+    tech: "Next.js, React, Node.js, PostgreSQL",
+    Ai: "OpenAI, meta-llama/llama-prompt-guard-2-22m",
   },
   // Add more pages here as needed
 ];
@@ -35,6 +35,8 @@ export default function Home() {
           <tr>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">Title</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">Path</th>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">Tech Stack</th>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">AI Modal</th>
           </tr>
         </thead>
         <tbody>
