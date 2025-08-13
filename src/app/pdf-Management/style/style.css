@@ -1,0 +1,217 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Modern PDF AI Search Design System */
+
+@layer base {
+  :root {
+    /* Black & White Core Colors */
+    --background: 0 0% 100%; /* Pure white */
+    --foreground: 0 0% 0%; /* Pure black */
+
+    --card: 0 0% 100%; /* White cards */
+    --card-foreground: 0 0% 0%; /* Black text */
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    /* Red Primary for important actions */
+    --primary: 0 84% 50%; /* Red */
+    --primary-foreground: 0 0% 100%; /* White text on red */
+    --primary-glow: 0 84% 60%;
+
+    /* Gray secondary */
+    --secondary: 0 0% 96%; /* Light gray */
+    --secondary-foreground: 0 0% 0%;
+
+    --muted: 0 0% 96%; /* Light gray */
+    --muted-foreground: 0 0% 45%; /* Medium gray */
+
+    /* Green accent for success/positive actions */
+    --accent: 120 84% 35%; /* Green */
+    --accent-foreground: 0 0% 100%; /* White text on green */
+    --accent-glow: 120 84% 45%;
+
+    --destructive: 0 84% 50%; /* Red for destructive actions */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%; /* Light gray borders */
+    --input: 0 0% 98%; /* Very light gray inputs */
+    --ring: 0 84% 50%; /* Red focus ring */
+
+    --radius: 0.75rem;
+
+    /* Black & White design tokens */
+    --gradient-primary: linear-gradient(135deg, hsl(0 84% 50%), hsl(0 84% 60%));
+    --gradient-accent: linear-gradient(135deg, hsl(120 84% 35%), hsl(120 84% 45%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 96%));
+    
+    /* Shadows */
+    --shadow-elegant: 0 10px 30px -10px hsl(0 0% 0% / 0.1);
+    --shadow-glow: 0 0 40px hsl(0 84% 50% / 0.2);
+    --shadow-accent: 0 8px 25px -8px hsl(120 84% 35% / 0.3);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark mode: Black background with white text */
+    --background: 0 0% 8%; /* Dark black */
+    --foreground: 0 0% 100%; /* Pure white */
+
+    --card: 0 0% 12%; /* Dark gray cards */
+    --card-foreground: 0 0% 100%; /* White text */
+
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 0 84% 55%; /* Bright red */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 20%; /* Dark gray */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 16%; /* Medium dark gray */
+    --muted-foreground: 0 0% 70%; /* Light gray text */
+
+    --accent: 120 84% 40%; /* Green accent */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 25%; /* Dark gray borders */
+    --input: 0 0% 16%; /* Dark inputs */
+    --ring: 0 84% 55%; /* Red focus ring */
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+@layer components {
+  /* Custom component utilities */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+  
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+  
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  
+  .shadow-accent {
+    box-shadow: var(--shadow-accent);
+  }
+  
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+  
+  .transition-bounce {
+    transition: var(--transition-bounce);
+  }
+  
+  /* Floating chat animation */
+  .float-animation {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  
+  /* Upload zone animation */
+  .upload-zone {
+    @apply border-2 border-dashed border-border rounded-xl p-8 text-center transition-smooth;
+  }
+  
+  .upload-zone.drag-active {
+    @apply border-primary bg-primary/5 shadow-accent;
+  }
+}
+
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
