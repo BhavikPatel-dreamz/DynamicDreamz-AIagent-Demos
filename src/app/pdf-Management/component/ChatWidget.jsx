@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Bot, User, FileText, Sparkles, AlertCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import Markdown from 'react-markdown';
 
 export const ChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -223,11 +225,12 @@ export const ChatWidget = () => {
       }
 
       const data = await response.json();
+      console.log('API response:', data);
 
       const assistantMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: data.response || data.answer || 'I found some information in your documents.',
+        content: data.answer  || 'I found some information in your documents.',
         timestamp: new Date(),
         pdfReferences: data.sources || data.references || [],
         metadata: data.metadata,
@@ -411,8 +414,8 @@ export const ChatWidget = () => {
                             : 'bg-white text-gray-800 shadow-sm border border-gray-100'
                       }`}
                     >
-                      <p>{message.content}</p>
-                      
+                      <Markdown>{message.content}</Markdown>
+
                       {/* PDF References */}
                       {message.pdfReferences && Array.isArray(message.pdfReferences) && message.pdfReferences.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">

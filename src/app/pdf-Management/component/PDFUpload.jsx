@@ -307,10 +307,22 @@ export const PDFUpload = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const removeFile = (fileId) => {
+  const removeFile = async (fileId) => {
     setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+    
+    const response = await fetch('/api/pdf-base/delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ids: [fileId],
+      }),
+    });
+
+    console.log("File removed from server response:", response);
     showToast("File Removed", "The file has been removed from the local list. Note: This doesn't delete the file from the server.");
-  };
+  }  
 
   const formatTimeAgo = (date) => {
     const seconds = Math.floor((new Date() - date) / 1000);
@@ -395,6 +407,7 @@ export const PDFUpload = () => {
       </div>
 
       {/* File Limit Information */}
+      
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
         <div className="flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600" />
@@ -560,6 +573,7 @@ export const PDFUpload = () => {
             
             <div className="space-y-4">
               {uploadedFiles.map((file, index) => (
+                console.log("file",file),
                 <div
                   key={file.id}
                   className="group flex items-center justify-between p-6 bg-gray-50 rounded-2xl transition-all duration-200 hover:bg-gray-100 hover:shadow-md"
