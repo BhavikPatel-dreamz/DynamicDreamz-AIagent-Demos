@@ -27,7 +27,7 @@ export const HeroSection = () => {
       {/* Content */}
       <div className="relative z-10 text-center max-w-4xl mx-auto px-6">
         <div className="space-y-6">
-          <h1 className="text-5xl md:text-7xl font-bold text-transparent bg-gradient-cosmic bg-clip-text leading-tight">
+          <h1 className="text-5xl md:text-7xl font-bold text-transparent bg-gradient-cosmic !bg-clip-text leading-tight">
             Mystical Astrology
           </h1>
           

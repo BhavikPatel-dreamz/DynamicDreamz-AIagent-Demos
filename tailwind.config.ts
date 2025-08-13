@@ -8,6 +8,8 @@ export default {
 		"./src/app/**/*.{ts,tsx}",
 		"./src/app/mystical-astrology/**/*.{ts,tsx}",
 		"./src/app/*.{ts,tsx}",
+		"./src/components/**/*.{ts,tsx}",
+		"./src/hooks/**/*.{ts,tsx}",
 	],
 	prefix: "",
 	theme: {
@@ -71,21 +73,6 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				}
-			},
-			backgroundImage: {
-				'gradient-cosmic': 'var(--gradient-cosmic)',
-				'gradient-mystical': 'var(--gradient-mystical)',
-				'gradient-hero': 'var(--gradient-hero)',
-				'gradient-card': 'var(--gradient-card)'
-			},
-			boxShadow: {
-				'mystical': 'var(--shadow-mystical)',
-				'celestial': 'var(--shadow-celestial)',
-				'cosmic': 'var(--shadow-cosmic)'
-			},
-			transitionProperty: {
-				'mystical': 'var(--transition-mystical)',
-				'glow': 'var(--transition-glow)'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

@@ -1,11 +1,8 @@
 @import "tailwindcss";
 
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-
-   --background: 25 35% 8%;
+@layer base {
+  :root {
+    --background: 25 35% 8%;
     --foreground: 45 85% 85%;
 
     --card: 25 25% 12%;
@@ -39,56 +36,183 @@
     --input: 25 20% 15%;
     --ring: 45 95% 55%;
 
-    /* Cosmic Gradients */
-    --gradient-cosmic: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--celestial)));
-    --gradient-mystical: linear-gradient(180deg, hsl(var(--mystical)), hsl(var(--secondary)));
-    --gradient-hero: linear-gradient(135deg, hsl(25 35% 5%), hsl(25 25% 12%), hsl(35 45% 8%));
-    --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(25 20% 15%));
-
-    /* Mystical Shadows */
-    --shadow-mystical: 0 8px 32px hsl(var(--primary) / 0.3);
-    --shadow-celestial: 0 0 40px hsl(var(--celestial) / 0.4);
-    --shadow-cosmic: 0 20px 60px -10px hsl(var(--mystical) / 0.5);
-
-    /* Smooth Transitions */
-    --transition-mystical: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-glow: all 0.3s ease-in-out;
-
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
-}
+  }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: #0a0a0a;
+      --foreground: #ededed;
+    }
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: Arial, Helvetica, sans-serif;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .bg-gradient-hero {
+    background: linear-gradient(135deg, hsl(25 35% 5%), hsl(25 25% 12%), hsl(35 45% 8%));
+  }
+  
+  .bg-gradient-cosmic {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--celestial)));
+  }
+  
+  .bg-gradient-mystical {
+    background: linear-gradient(180deg, hsl(var(--mystical)), hsl(var(--secondary)));
+  }
+  
+  .bg-gradient-card {
+    background: linear-gradient(145deg, hsl(var(--card)), hsl(25 20% 15%));
+  }
+  
+  .shadow-mystical {
+    box-shadow: 0 8px 32px hsl(var(--primary) / 0.3);
+  }
+  
+  .shadow-celestial {
+    box-shadow: 0 0 40px hsl(var(--celestial) / 0.4);
+  }
+  
+  .shadow-cosmic {
+    box-shadow: 0 20px 60px -10px hsl(var(--mystical) / 0.5);
+  }
+  
+  .transition-glow {
+    transition: all 0.3s ease-in-out;
+  }
+  .text-celestial {
+    color: hsl(var(--celestial));
+  }
+  .text-mystical {
+    color: hsl(var(--mystical));
+  }
+  .text-secondary {
+    color: hsl(var(--secondary));
+  }
+  .bg-celestial {
+    background-color: hsl(var(--celestial));
+  }
+  .text-primary {
+    color: hsl(var(--primary));
+  }
+  /* Text color utilities */
+  .text-primary-foreground {
+    color: hsl(var(--primary-foreground));
+  }
+  
+  .text-secondary-foreground {
+    color: hsl(var(--secondary-foreground));
+  }
+  
+  .text-muted-foreground {
+    color: hsl(var(--muted-foreground));
+  }
+  
+  .text-accent-foreground {
+    color: hsl(var(--accent-foreground));
+  }
+  
+  .text-card-foreground {
+    color: hsl(var(--card-foreground));
+  }
+  
+  .text-popover-foreground {
+    color: hsl(var(--popover-foreground));
+  }
+  
+  .text-destructive-foreground {
+    color: hsl(var(--destructive-foreground));
+  }
+  
+  .text-celestial-foreground {
+    color: hsl(var(--celestial-foreground));
+  }
+  
+  .text-mystical-foreground {
+    color: hsl(var(--mystical-foreground));
+  }
+  
+  /* Background color utilities */
+  .bg-primary {
+    background-color: hsl(var(--primary));
+  }
+  
+  .bg-secondary {
+    background-color: hsl(var(--secondary));
+  }
+  
+  .bg-muted {
+    background-color: hsl(var(--muted));
+  }
+  
+  .bg-accent {
+    background-color: hsl(var(--accent));
+  }
+  
+  .bg-card {
+    background-color: hsl(var(--card));
+  }
+  
+  .bg-popover {
+    background-color: hsl(var(--popover));
+  }
+  
+  .bg-destructive {
+    background-color: hsl(var(--destructive));
+  }
+  
+  .bg-mystical {
+    background-color: hsl(var(--mystical));
+  }
+  
+  /* Border color utilities */
+  .border-primary {
+    border-color: hsl(var(--primary));
+  }
+  
+  .border-secondary {
+    border-color: hsl(var(--secondary));
+  }
+  
+  .border-muted {
+    border-color: hsl(var(--muted));
+  }
+  
+  .border-accent {
+    border-color: hsl(var(--accent));
+  }
+  
+  .border-card {
+    border-color: hsl(var(--card));
+  }
+  
+  .border-popover {
+    border-color: hsl(var(--popover));
+  }
+  
+  .border-destructive {
+    border-color: hsl(var(--destructive));
+  }
+  
+  .border-mystical {
+    border-color: hsl(var(--mystical));
+  }
+  
+  .border-celestial {
+    border-color: hsl(var(--celestial));
+  }
 }

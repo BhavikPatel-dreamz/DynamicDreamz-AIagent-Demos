@@ -3,12 +3,12 @@ import { cn } from "../../lib/utils";
 import { Star, Moon } from "lucide-react";
 
 interface ChatMessageProps {
-  message: string;
+  text: string;
   isUser: boolean;
   timestamp?: string;
 }
 
-export const ChatMessage = ({ message, isUser, timestamp }: ChatMessageProps) => {
+export const ChatMessage = ({ text, isUser, timestamp }: ChatMessageProps) => {
   return (
     <div
       className={cn(
@@ -30,7 +30,7 @@ export const ChatMessage = ({ message, isUser, timestamp }: ChatMessageProps) =>
           "text-sm leading-relaxed",
           isUser ? "text-primary-foreground" : "text-card-foreground"
         )}>
-          {message}
+          {text}
         </div>
         {/* {timestamp && (
           <div className="text-xs text-muted-foreground opacity-70">

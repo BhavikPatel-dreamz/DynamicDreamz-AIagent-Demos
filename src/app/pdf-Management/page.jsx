@@ -21,7 +21,7 @@ const page = () => {
 
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
             Search Your PDFs with{' '}
-            <span className="bg-gradient-to-r from-red-500 via-red-600 to-orange-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-red-500 via-red-600 to-orange-500 !bg-clip-text text-transparent">
               AI Intelligence
             </span>
           </h1>

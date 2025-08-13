@@ -98,7 +98,7 @@ export const ChatAssistant = () => {
             {messages.map((message) => (
               <ChatMessage
                 key={message.id}
-                message={message.text}
+                text={message.text}
                 isUser={message.isUser}
                 timestamp={message.timestamp}
               />
