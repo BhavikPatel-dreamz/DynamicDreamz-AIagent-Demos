@@ -81,54 +81,38 @@ class PDFRAGAgent {
 
   async uploadPdf(userId, files) {
     try {
-      const uploadStatus = new Map();
-      const updateStatus = (
-        uid,
-        status,
-        progress = 0,
-        message = "",
-        data = null
-      ) => {
-        const statusObj = {
-          status,
-          progress,
-          message,
-          data,
-          timestamp: new Date(),
-        };
-        uploadStatus.set(uid, statusObj);
-        console.log(
-          `Status Update [${uid}]: ${status} - ${progress}% - ${message}`
-        );
-      };
-
       // Convert single file to array
       const fileList = Array.isArray(files) ? files : [files];
+
+      // 🚀 NEW: Validate maximum number of files (3 max)
+      if (fileList.length > 3) {
+        throw new Error("Maximum 3 files allowed per upload");
+      }
+
       const results = [];
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
       for (const file of fileList) {
-        updateStatus(userId, "processing", 10, `Processing ${file.name}`);
 
         // 1️⃣ Validate file
         if (!file) {
-          updateStatus(userId, "error", 0, "No file uploaded");
           throw new Error("No file uploaded");
         }
+
         if (file.type !== "application/pdf") {
-          updateStatus(
-            userId,
-            "error",
-            0,
-            "Invalid file type. Only PDFs are allowed"
-          );
           throw new Error("Invalid file type. Only PDFs are allowed");
         }
+
         if (file.size === 0) {
-          updateStatus(userId, "error", 0, "Uploaded file is empty");
           throw new Error("Uploaded file is empty");
         }
 
-        updateStatus(userId, "extracting", 30, "Extracting text from PDF");
+        // 🚀 NEW: Validate file size (10MB max)
+        if (file.size > MAX_FILE_SIZE) {
+          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+          throw new Error(`File "${file.name}" is too large (${fileSizeMB}MB). Maximum size allowed is 10MB`);
+        }
+
 
         // 2️⃣ Convert to buffer and extract text
         const arrayBuffer = await file.arrayBuffer();
@@ -148,16 +132,12 @@ class PDFRAGAgent {
           fullText += pageText + "\n";
         }
 
-        updateStatus(userId, "chunking", 50, "Creating text chunks");
-
         // 3️⃣ Create chunks
         const chunks = this.chunkText(
           fullText,
           this.chunkSize,
           this.chunkOverlap
         );
-
-        updateStatus(userId, "embedding", 70, "Generating embeddings");
 
         // 4️⃣ Generate embeddings for each chunk
         const points = [];
@@ -182,12 +162,8 @@ class PDFRAGAgent {
           });
         }
 
-        updateStatus(userId, "storing", 90, "Storing in vector database");
-
         // 5️⃣ Store in Qdrant
         await this.qdrantManager.addDocuments(this.collectionName, points);
-
-        updateStatus(userId, "complete", 100, "Upload completed successfully");
 
         results.push({
           success: true,
@@ -196,6 +172,7 @@ class PDFRAGAgent {
           userId,
           totalChunks: chunks.length,
           totalPages: pdfDoc.numPages,
+          fileSize: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
         });
       }
 
@@ -207,7 +184,7 @@ class PDFRAGAgent {
   }
 
   async getChatHistory(userId, conversationId = null, limit = 10) {
-     if (!this.db) await this.initializeDB();
+    if (!this.db) await this.initializeDB();
     try {
       const filter = { userId };
       if (conversationId) {
@@ -230,7 +207,7 @@ class PDFRAGAgent {
     response,
     searchResults = []
   ) {
-     if (!this.db) await this.initializeDB();
+    if (!this.db) await this.initializeDB();
     try {
       await this.db.collection("pmd_based_chat_history").insertOne({
         userId,
@@ -320,9 +297,8 @@ class PDFRAGAgent {
       for (const result of relevantResults) {
         const chunkText = result.payload.text;
         if (currentLength + chunkText.length <= this.maxContextLength) {
-          context += `Source: ${result.payload.filename} (Chunk ${
-            result.payload.chunkIndex + 1
-          })\n${chunkText}\n\n`;
+          context += `Source: ${result.payload.filename} (Chunk ${result.payload.chunkIndex + 1
+            })\n${chunkText}\n\n`;
           currentLength += chunkText.length;
           usedSources.add(result.payload.filename);
         } else {
@@ -343,11 +319,10 @@ class PDFRAGAgent {
       Context from PDF documents:
       ${context}
       
-      ${
-        formattedHistory
+      ${formattedHistory
           ? `Previous conversation history:\n${formattedHistory}\n\n`
           : ""
-      }`;
+        }`;
 
       const userPrompt = `Question: ${query}`;
 
@@ -410,26 +385,26 @@ class PDFRAGAgent {
     }
   }
 
-  async deletePdf(userId, filename) {
+  async deletePdf(ids) {
     try {
       // Delete from Qdrant
-      await this.qdrantManager.deleteByFilter(this.collectionName, {
-        must: [
-          { key: "userId", match: { value: userId } },
-          { key: "filename", match: { value: filename } },
-        ],
-      });
-
-
+      console.log(ids)
+      await this.qdrantManager.deleteDocuments(
+        "pdf-base",
+        ids
+      );
       return {
         success: true,
-        message: `${filename} deleted successfully`,
+        message: `${ids.length} document(s) with IDs [${ids.join(', ')}] deleted successfully`,
+        deletedIds: ids,
+        count: ids.length
       };
     } catch (error) {
       console.error("Error deleting PDF:", error);
-      throw new Error(`Failed to delete PDF: ${error.message}`);
+      throw new Error(`Failed to delete PDF(s): ${error.message}`);
     }
   }
+
 
   async getChatSessions(userId) {
     try {
@@ -438,15 +413,15 @@ class PDFRAGAgent {
         {
           $group: {
             _id: "$conversationId",
-              lastMessage: { $last: "$message" },
-              lastResponse: { $last: "$response" },
-              messageCount: { $sum: 1 },
-              lastUpdated: { $max: "$createdAt" },
-              firstMessage: { $first: "$createdAt" },
-            },
+            lastMessage: { $last: "$message" },
+            lastResponse: { $last: "$response" },
+            messageCount: { $sum: 1 },
+            lastUpdated: { $max: "$createdAt" },
+            firstMessage: { $first: "$createdAt" },
           },
-          { $sort: { lastUpdated: -1 } },
-        ]
+        },
+        { $sort: { lastUpdated: -1 } },
+      ]
       );
 
       return {

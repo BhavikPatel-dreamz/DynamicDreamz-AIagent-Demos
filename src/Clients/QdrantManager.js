@@ -90,26 +90,26 @@ class QdrantManager {
    * @returns {Promise<Array>} Operation results
    */
   async addDocuments(collectionName, documents) {
-        try {
-            const points = documents.map(doc => ({
-                id: doc.id || uuidv4(), // Generate a new UUID if no ID is provided
-                vector: doc.vector,
-                payload: doc.payload || {}
-            }));
+    try {
+      const points = documents.map(doc => ({
+        id: doc.id || uuidv4(), // Generate a new UUID if no ID is provided
+        vector: doc.vector,
+        payload: doc.payload || {}
+      }));
 
 
-            const result = await this.client.upsert(collectionName, {
-                wait: true,
-                points: points
-            });
+      const result = await this.client.upsert(collectionName, {
+        wait: true,
+        points: points
+      });
 
-            console.log(`✅ Added ${points.length} documents to ${collectionName}`);
-            return result;
-        } catch (error) {
-            console.error('Error adding documents:', error);
-            throw error;
-        }
+      console.log(`✅ Added ${points.length} documents to ${collectionName}`);
+      return result;
+    } catch (error) {
+      console.error('Error adding documents:', error);
+      throw error;
     }
+  }
 
   /**
    * Search for similar vectors with enhanced filtering options
@@ -203,7 +203,7 @@ class QdrantManager {
 
     console.log(`🔍 Searching collection ${collectionName} for userID: ${userID}`)
     console.log(`Filter: ${JSON.stringify(filter)}`);
-    
+
     return this.search(collectionName, queryVector, {
       ...options,
       filter: filter,
@@ -321,18 +321,42 @@ class QdrantManager {
   }
 
   /**
+ * Get all documents for a specific user
+ * @param {string} collectionName - Name of the collection
+ * @param {Object} filter - Additional options
+ */
+  async deleteByFilter(collectionName, filter) {
+    try {
+      console.log("Delete filter:", JSON.stringify(filter, null, 2));
+      const result = await this.client.delete(collectionName, {
+        filter: filter,
+        wait: true,
+      });
+
+      console.log(
+        `✅ Deleted documents for userID `
+      );
+      return result;
+    } catch (error) {
+      console.log(error.message)
+      console.error("Error deleting documents by userID:", error);
+      throw error;
+    }
+  }
+  /**
    * Delete documents from collection by IDs
    * @param {string} collectionName - Name of the collection
    * @param {Array} ids - Array of document IDs to delete
    */
   async deleteDocuments(collectionName, ids) {
     try {
+     
       await this.client.delete(collectionName, {
-        ids: ids,
+        points:ids,
         wait: true,
       });
+       console.log(`✅ Deleted ${ids} documents from ${collectionName}`);
 
-      console.log(`✅ Deleted ${ids.length} documents from ${collectionName}`);
     } catch (error) {
       console.error("Error deleting documents:", error);
       throw error;
