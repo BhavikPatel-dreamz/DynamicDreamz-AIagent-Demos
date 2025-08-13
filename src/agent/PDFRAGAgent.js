@@ -183,22 +183,30 @@ class PDFRAGAgent {
     }
   }
 
+
   async getChatHistory(userId, conversationId = null, limit = 10) {
-    if (!this.db) await this.initializeDB();
-    try {
-      const filter = { userId };
-      if (conversationId) {
-        filter.conversationId = conversationId;
-      }
+  if (!this.db) await this.initializeDB();
 
-      const history = await this.db.collection('pmd_based_chat_history').find({ filter }).sort({ createdAt: -1 }).limit(limit).toArray();
-
-      return history.reverse(); // Return in chronological order
-    } catch (error) {
-      console.error("Error fetching chat history:", error);
-      return [];
+  try {
+    const filter = { userId };
+    if (conversationId) {
+      filter.conversationId = conversationId;
     }
+
+    const history = await this.db
+      .collection("Pdf_based_chat_history")
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    console.log(history);
+    return history.reverse(); // chronological order
+  } catch (error) {
+    console.error("Error fetching chat history:", error);
+    return [];
   }
+}
 
   async saveChatMessage(
     userId,
@@ -209,7 +217,7 @@ class PDFRAGAgent {
   ) {
     if (!this.db) await this.initializeDB();
     try {
-      await this.db.collection("pmd_based_chat_history").insertOne({
+     const test= await this.db.collection("Pdf_based_chat_history").insertOne({
         userId,
         conversationId,
         message,
@@ -235,9 +243,7 @@ class PDFRAGAgent {
 
   async chatMessage(userId, query, conversationId = null) {
     try {
-      console.log(`🔍 Processing query for userId: ${userId}`);
 
-      // 1️⃣ Get chat history
       const chatHistory = await this.getChatHistory(
         userId,
         conversationId,
@@ -269,7 +275,7 @@ class PDFRAGAgent {
           "I couldn't find relevant information in your uploaded PDFs to answer this question. Could you try rephrasing your question or upload more relevant documents?";
 
         // Save to chat history
-        if (conversationId) {
+          if (userId) {
           await this.saveChatMessage(
             userId,
             conversationId,
@@ -277,7 +283,7 @@ class PDFRAGAgent {
             noResultsResponse,
             []
           );
-        }
+          }
 
         return {
           success: true,
@@ -337,7 +343,7 @@ class PDFRAGAgent {
         "I apologize, but I couldn't generate a response. Please try again.";
 
       // 8️⃣ Save to chat history
-      if (conversationId) {
+        if (userId) {
         await this.saveChatMessage(
           userId,
           conversationId,
@@ -345,7 +351,7 @@ class PDFRAGAgent {
           answer,
           relevantResults
         );
-      }
+       }
 
       // 9️⃣ Return response
       return {
@@ -408,7 +414,7 @@ class PDFRAGAgent {
 
   async getChatSessions(userId) {
     try {
-      const sessions = await this.db.collection("pmd_based_chat_history").aggregate([
+      const sessions = await this.db.collection("Pdf_based_chat_history").aggregate([
         { $match: { userId } },
         {
           $group: {
