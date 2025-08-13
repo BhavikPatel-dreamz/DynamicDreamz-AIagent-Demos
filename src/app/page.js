@@ -23,6 +23,13 @@ const pages = [
     tech: "Next.js, React, Node.js, PostgreSQL",
     Ai: "OpenAI, meta-llama/llama-prompt-guard-2-22m",
   },
+  {
+    title: "Mystical Astrology",
+    path: "/mystical-astrology",
+    description: "An AI-powered tool to explore astrological insights and predictions.",
+    tech: "Next.js, React, Node.js, PostgreSQL",
+    Ai: "OpenAI, meta-llama/llama-prompt-guard-2-22m",
+  },
   // Add more pages here as needed
 ];
 

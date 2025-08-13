@@ -4,7 +4,7 @@ import { Header } from './component/Header'
 import { AlertCircle, Database, Zap, Sparkles, Info } from 'lucide-react';
 import { PDFUpload } from './component/PDFUpload';
 import { ChatWidget } from './component/ChatWidget';
-import "./style/style.css"
+
 
 const page = () => {
   return (

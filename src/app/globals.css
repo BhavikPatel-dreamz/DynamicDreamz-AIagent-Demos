@@ -4,6 +4,73 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+   --background: 25 35% 8%;
+    --foreground: 45 85% 85%;
+
+    --card: 25 25% 12%;
+    --card-foreground: 45 75% 80%;
+
+    --popover: 25 25% 10%;
+    --popover-foreground: 45 75% 85%;
+
+    --primary: 45 95% 55%;
+    --primary-foreground: 25 35% 8%;
+
+    --secondary: 30 45% 25%;
+    --secondary-foreground: 45 85% 85%;
+
+    --muted: 25 20% 15%;
+    --muted-foreground: 45 25% 65%;
+
+    --accent: 50 85% 65%;
+    --accent-foreground: 25 35% 8%;
+
+    --mystical: 35 75% 45%;
+    --mystical-foreground: 45 95% 95%;
+
+    --celestial: 55 90% 70%;
+    --celestial-foreground: 25 35% 8%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 45 95% 95%;
+
+    --border: 25 15% 20%;
+    --input: 25 20% 15%;
+    --ring: 45 95% 55%;
+
+    /* Cosmic Gradients */
+    --gradient-cosmic: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--celestial)));
+    --gradient-mystical: linear-gradient(180deg, hsl(var(--mystical)), hsl(var(--secondary)));
+    --gradient-hero: linear-gradient(135deg, hsl(25 35% 5%), hsl(25 25% 12%), hsl(35 45% 8%));
+    --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(25 20% 15%));
+
+    /* Mystical Shadows */
+    --shadow-mystical: 0 8px 32px hsl(var(--primary) / 0.3);
+    --shadow-celestial: 0 0 40px hsl(var(--celestial) / 0.4);
+    --shadow-cosmic: 0 20px 60px -10px hsl(var(--mystical) / 0.5);
+
+    /* Smooth Transitions */
+    --transition-mystical: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-glow: all 0.3s ease-in-out;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
 }
 
 @theme inline {
