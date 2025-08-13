@@ -11,6 +11,11 @@ const pages = [
     path: "/resume-ai-search-boost",
     description: "An AI-powered tool to enhance your resume and boost your job search.",
   },
+  {
+    title: "PDF Analysis",
+    path: "/pdf-Management",
+    description: "An AI-powered tool to enhance your resume and boost your job search.",
+  },
   // Add more pages here as needed
 ];
 
