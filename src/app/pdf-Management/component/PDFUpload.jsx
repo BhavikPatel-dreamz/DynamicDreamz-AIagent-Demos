@@ -316,8 +316,7 @@ export const PDFUpload = () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        filename: fileId,
-        userId: userId.trim(),
+        ids: [fileId],
       }),
     });
 
@@ -574,6 +573,7 @@ export const PDFUpload = () => {
             
             <div className="space-y-4">
               {uploadedFiles.map((file, index) => (
+                console.log("file",file),
                 <div
                   key={file.id}
                   className="group flex items-center justify-between p-6 bg-gray-50 rounded-2xl transition-all duration-200 hover:bg-gray-100 hover:shadow-md"
