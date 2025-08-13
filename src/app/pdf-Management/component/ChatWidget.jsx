@@ -223,11 +223,12 @@ export const ChatWidget = () => {
       }
 
       const data = await response.json();
+      console.log('API response:', data);
 
       const assistantMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: data.response || data.answer || 'I found some information in your documents.',
+        content: data.answer  || 'I found some information in your documents.',
         timestamp: new Date(),
         pdfReferences: data.sources || data.references || [],
         metadata: data.metadata,

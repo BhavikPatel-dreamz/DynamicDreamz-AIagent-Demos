@@ -33,14 +33,14 @@ const page = () => {
         </section>
 
         {/* Search Bar Placeholder */}
-        {/* <section className="mb-12">
+         {/* <section className="mb-12">
           <div className="bg-white rounded-2xl border border-gray-200 p-4 max-w-4xl mx-auto shadow-sm">
             <div className="flex items-center gap-3 text-gray-400">
               <Info className="w-5 h-5" />
               <span className="text-base">Search functionality will be enabled once PDFs are uploaded and AI is connected...</span>
             </div>
           </div>
-        </section> */}
+        </section>  */}
 
         {/* Features Grid */}
         <section className="grid md:grid-cols-3 gap-4 mb-12">

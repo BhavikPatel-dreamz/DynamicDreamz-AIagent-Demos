@@ -23,8 +23,9 @@ export async function POST(request: NextRequest) {
     });
   
     const result = await PDFAgent.chatMessage(userId, query);
+    console.log("Query result:", result);
     
-    return NextResponse.json(result.answer, {
+    return NextResponse.json(result, {
       status: 200});
   } catch (error: any) {
     console.error("Query upload error:", error.message);

@@ -5,16 +5,23 @@ const pages = [
     title: "Personal Finance Assistant",
     path: "/finance",
     description: "A personal finance assistant that helps you manage your finances effectively.",
+    tech: "Next.js, React, Node.js, MongoDB",
+    Ai: "OpenAI, ChatGPT",
   },
   {
     title: "Resume AI Search Boost (HR Assistant)",
     path: "/resume-ai-search-boost",
     description: "An AI-powered tool to enhance your resume and boost your job search.",
+    tech: "Next.js, React, Node.js, MongoDB",
+    Ai: "OpenAI, ChatGPT",
+
   },
   {
-    title: "PDF Analysis",
+    title: "PDF Based Chat Support",
     path: "/pdf-Management",
     description: "An AI-powered tool to enhance your resume and boost your job search.",
+    tech: "Next.js, React, Node.js, MongoDB",
+    Ai: "OpenAI, ChatGPT",
   },
   // Add more pages here as needed
 ];
@@ -40,6 +47,12 @@ export default function Home() {
               </td>
               <td className="px-6 py-4 font-mono text-sm text-gray-500 dark:text-gray-400">
                 {page.description || "No description available"}
+              </td>
+              <td className="px-6 py-4 font-mono text-sm text-gray-500 dark:text-gray-400">
+                {page.tech || "No tech stack available"}
+              </td>
+              <td className="px-6 py-4 font-mono text-sm text-gray-500 dark:text-gray-400">
+                {page.Ai || "No AI tools available"}
               </td>
             </tr>
           ))}
