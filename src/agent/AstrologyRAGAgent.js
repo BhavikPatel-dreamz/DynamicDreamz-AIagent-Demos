@@ -281,7 +281,7 @@ Guidelines:
     if (toolOutput) await this.addToHistory(userId, "assistant", toolOutput, { type: "tool_execution" });
 
     console.log("Returning astrology response:", { response: userVisibleResponse, toolResult: toolOutput });
-    return { response: userVisibleResponse, toolResult: toolOutput };
+    return { answer: userVisibleResponse, toolResult: toolOutput };
   }
 
   async getAstrologyContext(userId) {

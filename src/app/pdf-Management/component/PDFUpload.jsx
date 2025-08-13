@@ -378,7 +378,7 @@ export const PDFUpload = () => {
           
           <div className="max-w-md">
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              User ID {getUserIdFromQuery() ? '(From URL)' : '(Auto-generated)'}
+              User ID 
             </label>
             <div className="relative">
               <input
@@ -392,10 +392,7 @@ export const PDFUpload = () => {
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              {getUserIdFromQuery() 
-                ? 'This ID is from URL parameters and synced across components'
-                : 'This ID is auto-generated and saved in your browser for future sessions'
-              }
+             
               {lastRefresh && (
                 <span className="block mt-1">
                   Last refreshed: {formatTimeAgo(lastRefresh)}

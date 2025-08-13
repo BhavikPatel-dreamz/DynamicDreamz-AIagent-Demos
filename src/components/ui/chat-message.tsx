@@ -2,6 +2,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { cn } from "../../lib/utils";
 import { Star, Moon } from "lucide-react";
 
+import ReactMarkdown from "react-markdown";
+
 interface ChatMessageProps {
   text: string;
   isUser: boolean;
@@ -30,7 +32,7 @@ export const ChatMessage = ({ text, isUser, timestamp }: ChatMessageProps) => {
           "text-sm leading-relaxed",
           isUser ? "text-primary-foreground" : "text-card-foreground"
         )}>
-          {text}
+          <ReactMarkdown>{text}</ReactMarkdown>
         </div>
         {/* {timestamp && (
           <div className="text-xs text-muted-foreground opacity-70">

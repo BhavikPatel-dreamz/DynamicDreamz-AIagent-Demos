@@ -1,5 +1,5 @@
 'use client';
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Card } from "../ui/card";
@@ -16,6 +16,7 @@ interface Message {
 }
 
 export const ChatAssistant = () => {
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -25,6 +26,7 @@ export const ChatAssistant = () => {
     }
   ]);
   const [inputValue, setInputValue] = useState("");
+   const [userId, setUserId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -58,22 +60,44 @@ export const ChatAssistant = () => {
     setIsLoading(true);
 
     // Simulate AI response delay
-    setTimeout(() => {
+
+   const response = await fetch('/api/astrology', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        question: inputValue
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: generateAstrologyResponse(inputValue),
+        text: data.answer || data.toolResult,
         isUser: false,
         timestamp: new Date().toLocaleTimeString()
       };
 
       setMessages(prev => [...prev, aiResponse]);
       setIsLoading(false);
-      
+
       toast({
         title: "Cosmic Wisdom Received",
         description: "The stars have shared their guidance with you.",
       });
-    }, 1500);
+    })
+    .catch(error => {
+      console.error("Error fetching AI response:", error);
+      setIsLoading(false);
+    });
+  };
+
+     const generateUserId = () => {
+    const timestamp = Date.now();
+    const randomNum = Math.floor(Math.random() * 10000);
+    return `user_${timestamp}_${randomNum}`;
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -82,6 +106,44 @@ export const ChatAssistant = () => {
       handleSendMessage();
     }
   };
+
+   const getUserIdFromQuery = () => {
+    if (typeof window === 'undefined') return null;
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('userId');
+  };
+  useEffect(() => {
+      const checkUserStatus = async () => {
+        setIsLoading(true);
+        
+        // Priority order: Query params -> LocalStorage -> Generate new
+        let finalUserId = getUserIdFromQuery();
+        
+        if (!finalUserId) {
+          // Try to get from localStorage
+          finalUserId = typeof window !== 'undefined' ? localStorage.getItem('astrology_user_id') : null;
+        }
+        
+        if (!finalUserId) {
+          // Generate new one only if neither query param nor localStorage exists
+          finalUserId = generateUserId();
+        }
+        
+        // Always store in localStorage for consistency
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('astrology_user_id', finalUserId);
+        }
+        
+        // Set the userId in state
+        setUserId(finalUserId);
+        
+      
+        
+        setIsLoading(false);
+      };
+  
+      checkUserStatus();
+    }, []);
 
   return (
     <Card className="w-full max-w-2xl mx-auto bg-gradient-card border-primary/20 shadow-cosmic">
