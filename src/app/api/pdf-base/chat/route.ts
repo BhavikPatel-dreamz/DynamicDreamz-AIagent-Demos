@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const PDFAgent = new PDFRAGAgent({
-        mongoDbName: 'PDF_assistant',
+        mongoDbName: 'Pdf_based_chat_history',
         maxHistoryLength: 20
     });
   
