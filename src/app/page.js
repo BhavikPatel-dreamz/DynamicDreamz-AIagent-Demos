@@ -30,6 +30,13 @@ const pages = [
     tech: "Next.js, React, Node.js, PostgreSQL",
     Ai: "OpenAI, meta-llama/llama-prompt-guard-2-22m",
   },
+  {
+    title: "ShopAssist - AI Shopping Companion",
+    path: "/shop-assist",
+    description: "An AI-powered shopping assistant that helps you find products, check orders, and get personalized recommendations.",
+    tech: "Next.js, React, TypeScript, Tailwind CSS",
+    Ai: "AI-powered shopping assistance with chat interface",
+  },
   // Add more pages here as needed
 ];
 
@@ -41,7 +48,7 @@ export default function Home() {
         <thead className="bg-gray-100 dark:bg-gray-800">
           <tr>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">Title</th>
-            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">Path</th>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">Description</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">Tech Stack</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">AI Modal</th>
           </tr>

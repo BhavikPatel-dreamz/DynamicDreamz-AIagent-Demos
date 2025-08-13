@@ -10,13 +10,16 @@
     "dev": "next dev --turbopack",
     "build": "next build ",
     "start": "next start -p 3000 ",
-    "lint": "next lint"
+    "lint": "next lint",
+    "mcp:shopify": "node start-shopify-mcp.js",
+    "dev:full": "concurrently \"npm run dev\" \"npm run mcp:shopify\""
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@modelcontextprotocol/sdk": "^1.17.2",
     "@prisma/client": "^6.13.0",
     "@qdrant/js-client-rest": "^1.15.0",
     "@radix-ui/react-accordion": "^1.2.11",
