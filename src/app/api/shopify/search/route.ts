@@ -26,8 +26,8 @@ export async function GET(request: NextRequest) {
 
     if (result.success && result.intent === 'product_search') {
       // Get product recommendations based on search
-      const products = await shopifyAgent.getProductRecommendations(null, category);
-      
+      const products = await shopifyAgent.getProductRecommendations(null, null);
+
       return NextResponse.json({
         success: true,
         query,

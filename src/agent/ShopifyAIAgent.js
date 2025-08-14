@@ -1,6 +1,5 @@
-const { MCPClient } = require('@modelcontextprotocol/sdk/client');
-const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio');
-const GroqClient = require('../Clients/GroqClient.js');
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 class ShopifyAIAgent {
   constructor() {
@@ -36,7 +35,7 @@ class ShopifyAIAgent {
         args: ['./mcp-servers/shopify-mcp.js']
       });
       
-      this.mcpClient = new MCPClient(transport);
+      this.mcpClient = new Client(transport);
       await this.mcpClient.connect();
       console.log('MCP Client connected successfully');
     } catch (error) {
@@ -524,7 +523,7 @@ Response:`;
     return suggestions[intent] || suggestions.general_help;
   }
 
-  async getProductRecommendations(userId, category = null) {
+  async getProductRecommendations(userId = null, category = null) {
     try {
       if (this.mcpClient) {
         const recommendations = await this.mcpClient.call('shopify/get_recommendations', {
@@ -621,4 +620,4 @@ Response:`;
   }
 }
 
-module.exports = ShopifyAIAgent; 
+export default ShopifyAIAgent;

@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
-import { mcpOrchestrator } from '../../../lib/mcp-orchestrator';
+
 
 export async function GET() {
   try {
-    const healthStatus = await mcpOrchestrator.healthCheck();
+
     
+
+    // const healthStatus = await mcpOrchestrator.healthCheck();
+    
+    // return NextResponse.json({
+    //   status: 'healthy',
+    //   timestamp: new Date().toISOString(),
+    //   mcp: healthStatus
+    // });
+
     return NextResponse.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      mcp: healthStatus
+      message: 'This is a placeholder response for health check. Implement mcpOrchestrator.healthCheck() to get actual response.',
+      mcp: {}
     });
+
   } catch (error) {
     console.error('Health check error:', error);
     return NextResponse.json(

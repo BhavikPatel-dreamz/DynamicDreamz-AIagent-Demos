@@ -1,4 +1,4 @@
-import AgentChat from '../components/AgentChat';
+import AgentChat from '../../components/mcp-agent/AgentChat';
 
 export default function MCPAgentPage() {
   return (

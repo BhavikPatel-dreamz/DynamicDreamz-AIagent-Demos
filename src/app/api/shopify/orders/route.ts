@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       ? `check order status for order #${orderNumber}`
       : `check order status for email ${email}`;
 
-    const result = await shopifyAgent.processMessage(query, userId || undefined);
+    const result = await shopifyAgent.processMessage(query);
 
     if (result.success && result.intent === 'order_status') {
       return NextResponse.json({
