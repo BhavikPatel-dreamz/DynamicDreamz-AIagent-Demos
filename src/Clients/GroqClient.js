@@ -1,11 +1,10 @@
-import axios from "axios";
+import Groq from 'groq-sdk';
 
 class GroqClient {
     constructor(config = {}) {
         const {
             apiKey = process.env.GROQ_API_KEY,
-            baseURL = 'https://api.groq.com/openai/v1',
-            defaultModel = 'openai/gpt-oss-120b',
+            defaultModel = 'llama-3.1-70b-versatile',
             timeout = 30000
         } = config;
 
@@ -13,11 +12,9 @@ class GroqClient {
             throw new Error('Groq API key is required');
         }
 
-        this.apiKey = apiKey;
-        this.baseURL = baseURL;
+        this.groq = new Groq({ apiKey: apiKey });
         this.defaultModel = defaultModel;
         this.timeout = timeout;
-        this.chatURL = `${baseURL}/chat/completions`;
     }
 
     /**
@@ -29,36 +26,27 @@ class GroqClient {
     async chat(messages, options = {}) {
         const {
             model = this.defaultModel,
-            temperature = 0.1,
+            temperature = 0.2,
             maxTokens = 1500,
             stream = false
         } = options;
 
-        const headers = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`
-        };
-
-        const payload = {
-            model: model,
-            messages: messages,
-            temperature: temperature,
-            max_tokens: maxTokens,
-            stream: stream
-        };
-
         try {
-            const response = await axios.post(this.chatURL, payload, {
-                headers: headers,
-                timeout: this.timeout
+            const completion = await this.groq.chat.completions.create({
+                model: model,
+                messages: messages,
+                temperature: temperature,
+                max_tokens: maxTokens,
+                stream: stream
             });
 
-            console.log('Groq API response:', response.data.choices[0]?.message.content);
+            const response = completion.choices[0]?.message?.content || '';
+            console.log('Groq API response:', response);
 
-            return response.data.choices[0]?.message?.content || '';
+            return response;
         } catch (error) {
-            console.error('Groq API error:', error.response?.data || error.message);
-            throw new Error(`Groq API error: ${error.response?.data?.error?.message || error.message}`);
+            console.error('Groq API error:', error.message);
+            throw new Error(`Groq API error: ${error.message}`);
         }
     }
 
@@ -78,19 +66,11 @@ class GroqClient {
      * Get available models
      */
     async getModels() {
-        const headers = {
-            'Authorization': `Bearer ${this.apiKey}`
-        };
-
         try {
-            const response = await axios.get(`${this.baseURL}/models`, {
-                headers: headers,
-                timeout: this.timeout
-            });
-
-            return response.data.data;
+            const models = await this.groq.models.list();
+            return models.data;
         } catch (error) {
-            console.error('Error fetching Groq models:', error.response?.data || error.message);
+            console.error('Error fetching Groq models:', error.message);
             throw error;
         }
     }

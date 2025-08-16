@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { v4 as uuidv4 } from "uuid";
 
