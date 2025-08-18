@@ -123,7 +123,7 @@ class QdrantManager {
       limit = 5,
       scoreThreshold = 0.6,
       withPayload = true,
-      withVector = false,
+      withVector = true,
       filter = null,
       offset = 0,
     } = options;

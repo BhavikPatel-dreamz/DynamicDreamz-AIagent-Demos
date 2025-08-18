@@ -1,62 +1,47 @@
 const axios = require('axios');
-const { QdrantClient } = require('@qdrant/js-client-rest');
-const { MongoClient, ObjectId } = require('mongodb');
+import GroqClient from "../Clients/GroqClient.js";
+import QdrantManager from "../Clients/QdrantManager.js";
+import JinaClient from "../Clients/JinaClient.js";
+import MongoManager from "../Clients/MongoManager.js";
 
 class HRRAGAgent {
     constructor(config) {
         const {
-            qdrantUrl = 'http://localhost:6333',
-            qdrantApiKey = null,
-            jinaApiKey = '',
-            groqApiKey = '',
-            collectionName = 'candidates',
-            mongoUrl = 'mongodb://localhost:27017',
-            mongoDbName = 'hr_assistant',
-            maxHistoryLength = 20
+            mongoDbName = "hr_assistant",
+            collectionName = "embeddings",
+            maxHistoryLength = 20,
+            chunkSize = 1000,
+            chunkOverlap = 200,
+            maxContextLength = 4000,
+            similarityThreshold = 0.7,
         } = config;
 
-        // Initialize Qdrant client
-        this.qdrantClient = new QdrantClient({
-            url: qdrantUrl,
-            apiKey: qdrantApiKey
-        });
-
-        this.jinaApiKey = jinaApiKey;
-        this.groqApiKey = groqApiKey;
-        this.collectionName = collectionName;
-        this.maxHistoryLength = maxHistoryLength;
-
-        // MongoDB configuration
-        this.mongoUrl = mongoUrl;
+        // Initialize clients
+        this.qdrantManager = new QdrantManager();
+        this.jina = new JinaClient();
+        this.groqClient = new GroqClient();
         this.mongoDbName = mongoDbName;
-        this.mongoClient = null;
+        this.dbPromise = new MongoManager({ dbName: 'hr_assistant' }).connect();
         this.db = null;
 
-        // API endpoints
-        this.jinaEmbedUrl = 'https://api.jina.ai/v1/embeddings';
-        this.groqChatUrl = 'https://api.groq.com/openai/v1/chat/completions';
+        this.collectionName = collectionName;
+        this.maxHistoryLength = maxHistoryLength;
+        this.chunkSize = chunkSize;
+        this.chunkOverlap = chunkOverlap;
+        this.maxContextLength = maxContextLength;
+        this.similarityThreshold = similarityThreshold;
     }
-
-    /**
-     * Initialize MongoDB connection
-     */
     async initializeDB() {
-        try {
-            this.mongoClient = new MongoClient(this.mongoUrl);
-            await this.mongoClient.connect();
-            this.db = this.mongoClient.db(this.mongoDbName);
-            
-            // Create indexes for better performance
-            await this.db.collection('chat_sessions').createIndex({ sessionId: 1 });
-            await this.db.collection('chat_sessions').createIndex({ userId: 1 });
-            await this.db.collection('chat_sessions').createIndex({ lastActivity: -1 });
-            await this.db.collection('chat_messages').createIndex({ sessionId: 1, timestamp: 1 });
-            await this.db.collection('search_analytics').createIndex({ timestamp: -1 });
-            
-            console.log('MongoDB connected successfully');
-        } catch (error) {
-            console.error('MongoDB connection error:', error);
-            throw error;
+        if (!this.db) {
+            try {
+                this.db = await this.dbPromise;
+                console.log("Database connection established");
+                const collections = await this.db.listCollections().toArray();
+                console.log("Available collections:", collections.map(c => c.name));
+            } catch (error) {
+                console.error("Error initializing database:", error);
+                throw error;
+            }
         }
     }
 
@@ -76,9 +61,9 @@ class HRRAGAgent {
         if (!this.db) await this.initializeDB();
 
         const id = sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
+
         const existingSession = await this.db.collection('chat_sessions').findOne({ sessionId: id });
-        
+
         if (!existingSession) {
             const session = {
                 sessionId: id,
@@ -89,7 +74,7 @@ class HRRAGAgent {
                 searchCount: 0,
                 status: 'active'
             };
-            
+
             await this.db.collection('chat_sessions').insertOne(session);
         } else {
             // Update last activity
@@ -98,7 +83,7 @@ class HRRAGAgent {
                 { $set: { lastActivity: new Date() } }
             );
         }
-        
+
         return id;
     }
 
@@ -121,7 +106,7 @@ class HRRAGAgent {
         // Update session stats
         await this.db.collection('chat_sessions').updateOne(
             { sessionId },
-            { 
+            {
                 $inc: { messageCount: 1 },
                 $set: { lastActivity: new Date() }
             }
@@ -138,7 +123,7 @@ class HRRAGAgent {
         if (!this.db) await this.initializeDB();
 
         const query = { sessionId };
-        const options = { 
+        const options = {
             sort: { timestamp: 1 },
             limit: limit || this.maxHistoryLength
         };
@@ -211,44 +196,11 @@ class HRRAGAgent {
     }
 
     /**
-     * Generate embeddings using Jina API
-     */
-    async embedText(text, model = 'jina-embeddings-v2-base-en') {
-        const headers = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.jinaApiKey}`
-        };
-
-        const payload = {
-            model: model,
-            input: [text]
-        };
-
-        try {
-            const response = await axios.post(this.jinaEmbedUrl, payload, {
-                headers: headers,
-                timeout: 30000
-            });
-
-            return response.data.data[0].embedding;
-        } catch (error) {
-            console.error('Error generating embeddings:', error.response?.data || error.message);
-            throw error;
-        }
-    }
-
-    /**
      * Search for similar candidates in Qdrant
      */
-    async searchSimilarCandidates(queryVector, limit = 10, scoreThreshold = 0.6) {
+    async searchSimilarCandidates(queryVector) {
         try {
-            const searchResult = await this.qdrantClient.search(this.collectionName, {
-                vector: queryVector,
-                limit: limit,
-                score_threshold: scoreThreshold,
-                with_payload: true,
-                with_vector: false
-            });
+            const searchResult = await this.qdrantManager.search('hr', queryVector);
 
             const candidates = searchResult.map(result => ({
                 id: result.id,
@@ -257,8 +209,7 @@ class HRRAGAgent {
                 candidateData: result.payload?.candidateData || {},
                 metadata: result.payload?.metadata || {}
             }));
-
-            return candidates;
+            return candidates
         } catch (error) {
             console.error('Error searching candidates:', error);
             throw error;
@@ -294,12 +245,12 @@ class HRRAGAgent {
         ];
 
         const lowerQuestion = question.toLowerCase();
-        
-        const hasSpecificIndicators = specificIndicators.some(indicator => 
+
+        const hasSpecificIndicators = specificIndicators.some(indicator =>
             lowerQuestion.includes(indicator)
         );
-        
-        const hasMultipleIndicators = multipleIndicators.some(indicator => 
+
+        const hasMultipleIndicators = multipleIndicators.some(indicator =>
             lowerQuestion.includes(indicator)
         );
 
@@ -313,12 +264,12 @@ class HRRAGAgent {
     /**
      * Generate HR-specific response with chat history context
      */
-    async generateHRResponse(sessionId, question, contextCandidates, model = 'llama3-8b-8192') {
+    async generateHRResponse(sessionId, question, contextCandidates) {
         const isSpecificQuery = this.isSpecificCandidateQuery(question);
 
         // Get chat history for context
         const chatHistory = await this.getChatHistory(sessionId, 10);
-        
+
         // Prepare context from retrieved candidates
         const context = contextCandidates
             .map((candidate, i) => {
@@ -337,8 +288,8 @@ Content: ${candidate.content}`;
             .join('\n\n');
 
         // Prepare chat history context
-        const historyContext = chatHistory.length > 0 ? 
-            chatHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n') : 
+        const historyContext = chatHistory.length > 0 ?
+            chatHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n') :
             'No previous conversation history.';
 
         let systemPrompt, userPrompt;
@@ -409,159 +360,141 @@ ${context}
 Return the matching candidates as a JSON array using the specified format, considering the conversation context to provide the most relevant results.`;
         }
 
-        const headers = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.groqApiKey}`
-        };
+        let messages = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ]
 
-        const payload = {
-            model: model,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.1,
-            max_tokens: 2000
-        };
 
-        try {
-            const response = await axios.post(this.groqChatUrl, payload, {
-                headers: headers,
-                timeout: 30000
-            });
-
-            const content = response.data.choices[0].message.content;
-
-            if (!isSpecificQuery) {
-                try {
-                    const jsonResponse = JSON.parse(content);
-                    return {
-                        type: 'candidates_list',
-                        data: jsonResponse
-                    };
-                } catch (parseError) {
-                    console.warn('Failed to parse JSON response, returning as text:', parseError.message);
-                    return {
-                        type: 'text',
-                        data: content
-                    };
-                }
-            }
-
-            return {
-                type: 'candidate_details',
-                data: content
-            };
-
-        } catch (error) {
-            console.error('Error generating response:', error.response?.data || error.message);
-            throw error;
-        }
+        const result = await this.groqClient.chat(messages);
+        return result
     }
 
-    /**
-     * Main chat method with history management
-     */
-    async chatWithHistory(sessionId, userId, query, options = {}) {
+   
+    async chatWithHistory(userId, query, options = {}) {
         const startTime = Date.now();
-        
+
         const {
-            limit = 10,
-            scoreThreshold = 0.6,
             embeddingModel = 'jina-embeddings-v2-base-en',
             chatModel = 'llama3-8b-8192'
         } = options;
 
         try {
-            // Ensure session exists
-            await this.createChatSession(userId, sessionId);
+            // Step 1: Create or get chat session
+            const sessionId = await this.createChatSession(userId);
 
-            console.log(`Processing query for session ${sessionId}:`, query);
-
-            // Add user message to history
+            // Step 2: Add user query to history
             await this.addToHistory(sessionId, 'user', query);
 
-            // Step 1: Generate embedding for the query
-            console.log('Generating embedding...');
-            const queryVector = await this.embedText(query, embeddingModel);
+            // Step 3: Generate query embedding
+            const queryVector = await this.jina.embedText(query, embeddingModel);
 
-            // Step 2: Search for similar candidates
-            console.log('Searching candidate database...');
-            const similarCandidates = await this.searchSimilarCandidates(
-                queryVector,
-                limit,
-                scoreThreshold
-            );
+            // Step 4: Search for similar candidates
+            const similarCandidates = await this.searchSimilarCandidates(queryVector);
 
-            if (similarCandidates.length === 0) {
-                const noResultsMessage = 'No relevant candidates found in the database for your search criteria. Could you try rephrasing your query or adjusting the requirements?';
-                
-                // Add assistant response to history
+            // Step 5: Handle no results case
+            const noResultsMessage = 'No relevant candidates found in the database for your search criteria. Could you try rephrasing your query or adjusting the requirements?';
+
+            if (!similarCandidates || similarCandidates.length === 0) {
                 await this.addToHistory(sessionId, 'assistant', noResultsMessage, {
                     type: 'no_results',
                     candidatesFound: 0
                 });
 
                 return {
-                    sessionId: sessionId,
-                    query: query,
-                    type: 'no_results',
-                    message: noResultsMessage,
-                    candidates: [],
+                    sessionId,
+                    query,
+                    answer: noResultsMessage,
+                    rawCandidates: [],
                     metadata: {
                         candidatesFound: 0,
                         averageScore: 0,
-                        processingTime: Date.now() - startTime
+                        processingTime: Date.now() - startTime,
+                        embeddingModel,
+                        chatModel
                     }
                 };
             }
 
-            // Step 3: Generate contextual response with history
-            console.log(`Found ${similarCandidates.length} relevant candidates. Generating contextual response...`);
-            const response = await this.generateHRResponse(sessionId, query, similarCandidates, chatModel);
+            // Step 6: Generate contextual response with history
+            const response = await this.generateHRResponse(sessionId, query, similarCandidates);
 
-            // Calculate metadata
+            // Step 7: Calculate metrics
             const averageScore = similarCandidates.reduce((sum, candidate) => sum + candidate.score, 0) / similarCandidates.length;
             const processingTime = Date.now() - startTime;
 
-            // Add assistant response to history
-            await this.addToHistory(sessionId, 'assistant', typeof response.data === 'string' ? response.data : JSON.stringify(response.data), {
-                type: response.type,
+            // Step 8: Parse response if needed
+            let parsedResponse = this.parseResponse(response);
+
+            // Step 9: Add assistant response to history
+            await this.addToHistory(sessionId, 'assistant', parsedResponse, {
+                type: response.type || 'success',
                 candidatesFound: similarCandidates.length,
                 averageScore: averageScore
             });
 
-            // Log search analytics
+            // Step 10: Log analytics
             await this.logSearchAnalytics(sessionId, query, similarCandidates.length, averageScore, processingTime);
 
+            // Step 11: Return formatted response
             return {
-                sessionId: sessionId,
-                query: query,
-                type: response.type,
-                data: response.data,
+                sessionId,
+                query,
+                answer: parsedResponse,
                 rawCandidates: similarCandidates,
                 metadata: {
                     candidatesFound: similarCandidates.length,
-                    averageScore: averageScore,
-                    processingTime: processingTime,
-                    embeddingModel: embeddingModel,
-                    chatModel: chatModel
+                    averageScore,
+                    processingTime,
+                    embeddingModel,
+                    chatModel
                 }
             };
 
         } catch (error) {
             console.error('Error in chat session:', error);
-            
-            // Add error to history
-            await this.addToHistory(sessionId, 'system', `Error: ${error.message}`, {
-                type: 'error',
-                error: error.message
-            });
-            
-            throw error;
+
+            // Try to log error if sessionId exists
+            try {
+                if (sessionId) {
+                    await this.addToHistory(sessionId, 'assistant', `Error: ${error.message}`, {
+                        type: 'error',
+                        candidatesFound: 0
+                    });
+                }
+            } catch (historyError) {
+                console.error('Failed to log error to history:', historyError);
+            }
+
+            return {
+                sessionId: sessionId || null,
+                query,
+                answer: errorMessage,
+                rawCandidates: [],
+                metadata: {
+                    candidatesFound: 0,
+                    averageScore: 0,
+                    processingTime: Date.now() - startTime,
+                    embeddingModel,
+                    chatModel,
+                    error: error.message
+                }
+            };
         }
     }
 
+    // Helper method to parse response consistently
+    parseResponse(response) {
+        if (typeof response === 'string') {
+            try {
+                const parsed = JSON.parse(response);
+                return (Array.isArray(parsed) || typeof parsed === 'object') ? parsed : response;
+            } catch {
+                return response;
+            }
+        }
+        return response;
+    }
     /**
      * Get conversation summary for a session
      */
@@ -590,36 +523,37 @@ Return the matching candidates as a JSON array using the specified format, consi
         try {
             const points = [];
 
-            for (const candidate of candidates) {
+            for (const [i, candidate] of candidates.entries()) {
                 const searchableContent = `
-                    Name: ${candidate.name || ''}
-                    Title: ${candidate.title || ''}
-                    Skills: ${Array.isArray(candidate.skills) ? candidate.skills.join(', ') : (candidate.skills || '')}
-                    Experience: ${Array.isArray(candidate.experience) ? candidate.experience.map(exp => exp.role).join(', ') : (candidate.experience || '')}
-                    Location: ${candidate.location || ''}
-                    Summary: ${candidate.summary || ''}
-                    ${candidate.content || ''}
-                `.trim();
+        Name: ${candidate.name || ''}
+        Title: ${candidate.title || ''}
+        Skills: ${Array.isArray(candidate.skills) ? candidate.skills.join(', ') : (candidate.skills || '')}
+        Experience: ${Array.isArray(candidate.experience) ? candidate.experience.map(exp => exp.role).join(', ') : (candidate.experience || '')}
+        Location: ${candidate.location || ''}
+        Summary: ${candidate.summary || ''}
+        ${candidate.content || ''}
+    `.trim();
 
-                const embedding = await this.embedText(searchableContent);
-                
+                const embedding = await this.jina.embedText(
+                    searchableContent,
+                    "jina-embeddings-v2-base-en"
+                );
+
                 points.push({
-                    id: candidate.id || Math.random().toString(36).substr(2, 9),
                     vector: embedding,
                     payload: {
                         content: searchableContent,
                         candidateData: candidate,
-                        metadata: candidate.metadata || {}
                     }
                 });
             }
-
-            await this.qdrantClient.upsert(this.collectionName, {
-                wait: true,
-                points: points
+            await this.qdrantManager.addDocuments("hr", points);
+            const results = [];
+            results.push({
+                success: true,
+                message: `candidates added successfully`,
             });
-
-            console.log(`Added ${points.length} candidates to collection ${this.collectionName}`);
+            return results
         } catch (error) {
             console.error('Error adding candidates:', error);
             throw error;
@@ -686,7 +620,7 @@ async function main() {
 }
 
 // Export the class
-module.exports = HRRAGAgent;
+export default HRRAGAgent;
 
 // Uncomment to run example
 // main();
