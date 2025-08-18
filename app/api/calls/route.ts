@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '../../../Clients/Prisma';
-import { initiateCall } from '../../../Clients/Twilio';
+import { db } from '../../../src/Clients/Prisma';
+import { initiateCall } from '../../../src/Clients/Twilio';
 
 export async function POST(request: NextRequest) {
   try {

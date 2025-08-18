@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import HRRAGAgent from "../../../../agent/HRRAGAgent";
+import HRRAGAgent from "../../../../src/agent/HRRAGAgent";
 import type { NextRequest } from "next/server";
 
 const hrAgent = new HRRAGAgent({

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '../../../../Clients/Prisma'; // Adjust the import path as necessary'
+import { db } from '../../../../src/Clients/Prisma'; // Adjust the import path as necessary'
 
 export async function POST(request: NextRequest) {
   try {

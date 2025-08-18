@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '../../../../Clients/Prisma';
-import { AIConversationEngine } from '../../../../agent/AIConversationEngine';
-import { generateTwiMLResponse } from '../../../../Clients/Twilio';
+import { db } from '../../../../src/Clients/Prisma';
+import { AIConversationEngine } from '../../../../src/agent/AIConversationEngine';
+import { generateTwiMLResponse } from '../../../../src/Clients/Twilio';
 
 export async function POST(request: NextRequest) {
   try {

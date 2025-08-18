@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import  AstrologyRAGAgent  from "../../../agent/AstrologyRAGAgent";
+import  AstrologyRAGAgent  from "../../../src/agent/AstrologyRAGAgent";
 import type { NextRequest } from "next/server";
 
 const astrologyAgent = new AstrologyRAGAgent({

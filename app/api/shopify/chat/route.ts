@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import ShopifyAIAgent from '../../../../agent/ShopifyAIAgent';
+import ShopifyAIAgent from '../../../../src/agent/ShopifyAIAgent';
 
 const shopifyAgent = new ShopifyAIAgent();
 

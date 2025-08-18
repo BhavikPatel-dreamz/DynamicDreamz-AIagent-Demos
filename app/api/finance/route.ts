@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import FinanceRAGAgent from "../../../agent/FinanceRAGAgent";
+import FinanceRAGAgent from "../../../src/agent/FinanceRAGAgent";
 import type { NextRequest } from "next/server";
 
 const financeAgent = new FinanceRAGAgent({

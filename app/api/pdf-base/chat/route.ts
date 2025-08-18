@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import PDFRAGAgent from "../../../../agent/PDFRAGAgent.js";
+import PDFRAGAgent from "../../../../src/agent/PDFRAGAgent.js";
 
 
 
