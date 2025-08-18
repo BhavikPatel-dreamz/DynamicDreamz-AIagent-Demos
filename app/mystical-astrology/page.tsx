@@ -1,7 +1,7 @@
-import { HeroSection } from "../../components/astrology/hero-section";
-import { ChatAssistant } from "../../components/astrology/chat-assistant";
-import { ZodiacWheel } from "../../components/astrology/zodiac-wheel";
-import { Card } from "../../components/ui/card";
+import { HeroSection } from "../../src/components/astrology/hero-section";
+import { ChatAssistant } from "../../src/components/astrology/chat-assistant";
+import { ZodiacWheel } from "../../src/components/astrology/zodiac-wheel";
+import { Card } from "../../src/components/ui/card";
 import { Star, Moon, Sun, Sparkles } from "lucide-react";
 
 export const metadata = {
