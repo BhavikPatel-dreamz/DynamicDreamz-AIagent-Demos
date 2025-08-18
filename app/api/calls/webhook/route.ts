@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       orderBy: { timestamp: 'asc' }
     });
 
-    const conversationHistory = existingTranscripts.map(t => ({
+    const conversationHistory = existingTranscripts.map((t: { speaker: string; message: any; timestamp: any; sentiment: any; }) => ({
       speaker: t.speaker as 'customer' | 'ai',
       message: t.message,
       timestamp: t.timestamp,
