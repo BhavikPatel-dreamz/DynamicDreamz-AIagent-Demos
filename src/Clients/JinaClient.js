@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { JinaAI } from 'jinaai';
+import JinaAI from 'jinaai';
+import axios from 'axios';
 
 /**
  * Jina Embeddings Client
@@ -8,7 +9,7 @@ class JinaClient {
     constructor(config = {}) {
         const {
             apiKey = process.env.JINA_API_KEY,
-            defaultModel = 'jina-embeddings-v2-base-en',
+            defaultModel = 'jina-embeddings-v3',
             timeout = 30000
         } = config;
 
@@ -31,19 +32,30 @@ class JinaClient {
         const {
             model = this.defaultModel,
         } = options;
+           try {
+    
+        const response = await axios.post(
+            "https://api.jina.ai/v1/embeddings",
+            {
+                model: "jina-embeddings-v3", // or jina-embeddings-v3, etc.
+                input: [input],
+                task: "retrieval.passage",
+                dimensions: 768,
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+                    "Content-Type": "application/json",
+                },
+                timeout: 30000,
+            }
+        );
 
-        try {
-            const response = await this.jina.embeddings.create({
-                model: model,
-                input: Array.isArray(input) ? input : [input],
-            });
-
-            const embeddings = response.data.map(item => item.embedding);
+            const embeddings = response.data.data.map(item => item.embedding);
             return Array.isArray(input) ? embeddings : embeddings[0];
-        } catch (error) {
-            console.error('Jina API error:', error.message);
-            throw new Error(`Jina API error: ${error.message}`);
-        }
+    } catch (err) {
+        console.error("Jina API Error:", err.response?.data || err.message);
+    }
     }
 
     /**

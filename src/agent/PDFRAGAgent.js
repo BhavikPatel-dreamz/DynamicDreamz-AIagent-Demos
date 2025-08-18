@@ -144,7 +144,7 @@ class PDFRAGAgent {
         for (let i = 0; i < chunks.length; i++) {
           const embeddingData = await this.jina.embedText(
             chunks[i].text,
-            "jina-embeddings-v2-base-en"
+            "jina-embeddings-v3"
           );
 
           points.push({
@@ -163,6 +163,7 @@ class PDFRAGAgent {
         }
 
         // 5️⃣ Store in Qdrant
+        console.log(points,"#####")
         await this.qdrantManager.addDocuments(this.collectionName, points);
 
         results.push({
@@ -280,7 +281,7 @@ class PDFRAGAgent {
       try {
         embeddingData = await this.jina.embedText(
           trimmedQuery,
-          "jina-embeddings-v2-base-en"
+          "jina-embeddings-v3"
         );
         
         if (!embeddingData || !Array.isArray(embeddingData)) {
@@ -497,7 +498,7 @@ class PDFRAGAgent {
     try {
       const embeddingData = await this.jina.embedText(
         searchQuery,
-        "jina-embeddings-v2-base-en"
+        "jina-embeddings-v3"
       );
       const searchResults = await this.qdrantManager.searchByUserID(
         this.collectionName,

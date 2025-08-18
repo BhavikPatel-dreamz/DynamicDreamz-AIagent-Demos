@@ -375,7 +375,7 @@ Return the matching candidates as a JSON array using the specified format, consi
         const startTime = Date.now();
 
         const {
-            embeddingModel = 'jina-embeddings-v2-base-en',
+            embeddingModel = 'jina-embeddings-v3',
             chatModel = 'llama3-8b-8192'
         } = options;
 
@@ -453,33 +453,7 @@ Return the matching candidates as a JSON array using the specified format, consi
 
         } catch (error) {
             console.error('Error in chat session:', error);
-
-            // Try to log error if sessionId exists
-            try {
-                if (sessionId) {
-                    await this.addToHistory(sessionId, 'assistant', `Error: ${error.message}`, {
-                        type: 'error',
-                        candidatesFound: 0
-                    });
-                }
-            } catch (historyError) {
-                console.error('Failed to log error to history:', historyError);
-            }
-
-            return {
-                sessionId: sessionId || null,
-                query,
-                answer: errorMessage,
-                rawCandidates: [],
-                metadata: {
-                    candidatesFound: 0,
-                    averageScore: 0,
-                    processingTime: Date.now() - startTime,
-                    embeddingModel,
-                    chatModel,
-                    error: error.message
-                }
-            };
+            throw Error 
         }
     }
 
@@ -536,7 +510,7 @@ Return the matching candidates as a JSON array using the specified format, consi
 
                 const embedding = await this.jina.embedText(
                     searchableContent,
-                    "jina-embeddings-v2-base-en"
+                    "jina-embeddings-v3"
                 );
 
                 points.push({
