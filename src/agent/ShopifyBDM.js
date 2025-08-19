@@ -50,69 +50,6 @@ class ShopifyDevConsultantAgent {
     }
   }
 
-  async createMongoIndexes() {
-    try {
-      await this.db.collection('chat_messages')
-        .createIndex({ clientId: 1, timestamp: -1 });
-
-      await this.db.collection('clients')
-        .createIndex({ email: 1 }, { unique: true });
-
-      await this.db.collection(this.config.mongodb.collections.quotes)
-        .createIndex({ clientId: 1, createdAt: -1 });
-
-      console.log("✅ MongoDB indexes created");
-    } catch (error) {
-      console.log("⚠️ Index creation warning:", error.message);
-    }
-  }
-
-  async initializeQdrant() {
-    try {
-      this.qdrantClient = new QdrantClient({
-        url: this.config.qdrant.url,
-        apiKey: this.config.qdrant.apiKey,
-      });
-
-      await this.qdrantClient.getCollections();
-      console.log("✅ Qdrant connected");
-    } catch (error) {
-      console.error("❌ Qdrant initialization failed:", error);
-      this.qdrantClient = null;
-    }
-  }
-
-  async initializeShopifyMCP() {
-    try {
-      const transport = new StdioClientTransport({
-        command: "npx",
-        args: ["-y", "@shopify/dev-mcp@latest"],
-        env: {
-          ...process.env,
-        }
-      });
-
-      this.mcpClient = new Client(
-        { name: "shopify-dev-consultant", version: "1.0.0" },
-        { capabilities: { tools: {}, resources: {} } }
-      );
-
-      const connectPromise = this.mcpClient.connect(transport);
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("MCP connect timeout")), 10000)
-      );
-
-      await Promise.race([connectPromise, timeoutPromise]);
-
-      const tools = await this.mcpClient.listTools();
-      console.log("✅ Shopify Dev MCP connected. Available tools:",
-        tools.tools?.map(t => t.name).slice(0, 5));
-    } catch (error) {
-      console.error("❌ Shopify MCP initialization failed:", error);
-      this.mcpClient = null;
-    }
-  }
-
   async processConsultationMessage(message, clientInfo = null) {
     try {
       console.log('🔄 Processing consultation message:', message);
@@ -329,7 +266,7 @@ Be thorough and ask clarifying questions to better understand the scope.`;
       
       return response;
     } catch (error) {
-      return this.getFallbackScopingResponse(intent);
+     console.error("Project scoping failed:", error);
     }
   }
 
@@ -450,7 +387,7 @@ Focus on relevant examples that match the client's needs.`;
 
   // MongoDB Operations
   async upsertClient(clientInfo) {
-    if (!this.db) return null;
+      if (!this.db) await this.initializeDB();
     
     try {
       const result = await this.db.collection('clients')
@@ -474,7 +411,7 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async storeConversation(conversationData) {
-    if (!this.db) return null;
+      if (!this.db) await this.initializeDB();
     
     try {
       const result = await this.db.collection('chat_messages')
@@ -487,7 +424,7 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async getConversationHistory(clientId, limit = 10) {
-    if (!this.db || !clientId) return [];
+       if (!this.db) await this.initializeDB();
     
     try {
       return await this.db.collection('chat_messages')
