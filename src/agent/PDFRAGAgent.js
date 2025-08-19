@@ -144,7 +144,7 @@ class PDFRAGAgent {
         for (let i = 0; i < chunks.length; i++) {
           const embeddingData = await this.jina.embedText(
             chunks[i].text,
-            "jina-embeddings-v3"
+            "jina-embeddings-v2-base-en"
           );
 
           points.push({
@@ -281,9 +281,8 @@ class PDFRAGAgent {
       try {
         embeddingData = await this.jina.embedText(
           trimmedQuery,
-          "jina-embeddings-v3"
+          "jina-embeddings-v2-base-en"
         );
-        
         if (!embeddingData || !Array.isArray(embeddingData)) {
           throw new Error('Invalid embedding response');
         }
@@ -498,7 +497,7 @@ class PDFRAGAgent {
     try {
       const embeddingData = await this.jina.embedText(
         searchQuery,
-        "jina-embeddings-v3"
+        "jina-embeddings-v2-base-en"
       );
       const searchResults = await this.qdrantManager.searchByUserID(
         this.collectionName,

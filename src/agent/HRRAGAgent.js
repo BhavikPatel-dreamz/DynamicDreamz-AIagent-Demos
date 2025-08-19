@@ -375,7 +375,7 @@ Return the matching candidates as a JSON array using the specified format, consi
         const startTime = Date.now();
 
         const {
-            embeddingModel = 'jina-embeddings-v3',
+            embeddingModel = 'jina-embeddings-v2-base-en',
             chatModel = 'llama3-8b-8192'
         } = options;
 
@@ -510,7 +510,7 @@ Return the matching candidates as a JSON array using the specified format, consi
 
                 const embedding = await this.jina.embedText(
                     searchableContent,
-                    "jina-embeddings-v3"
+                    "jina-embeddings-v2-base-en"
                 );
 
                 points.push({
