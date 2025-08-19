@@ -1,96 +1,69 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { MongoClient } from 'mongodb';
-import { QdrantClient } from '@qdrant/js-client-rest';
-import GroqClient from "@/Clients/GroqClient";
+import GroqClient from "../Clients/GroqClient.js";
+import QdrantManager from "../Clients/QdrantManager.js";
+import JinaClient from "../Clients/JinaClient.js";
+import MongoManager from "../Clients/MongoManager.js";
 
 class ShopifyDevConsultantAgent {
-  constructor() {
-    this.mcpClient = null;
-    this.mongoClient = null;
-    this.qdrantClient = null;
-    this.groqClient = null;
-    
-    // Configuration
-    this.config = {
-      mongodb: {
-        uri: process.env.MONGODB_URI,
-        dbName: process.env.MONGODB_DB_NAME || 'shopify_consultant',
-        collections: {
-          conversations: 'bdm_conversations',
-          clients: 'bdm_clients',
-          quotes: 'bdm_quotes',
-          projects: 'bdm_projects'
-        }
-      },
-      qdrant: {
-        url: process.env.QDRANT_URL || 'http://localhost:6333',
-        apiKey: process.env.QDRANT_API_KEY,
-        collections: {
-          quotes: 'shopify_quotes',
-          projects: 'shopify_projects',
-          knowledge: 'shopify_knowledge'
-        }
-      },
-      jina: {
-        apiKey: process.env.JINA_API_KEY,
-        baseUrl: 'https://api.jina.ai/v1/embeddings'
+
+  constructor(config = {}) {
+    const {
+      mongoDbName = "shopify_consultant",
+      collectionName = "shopify_quotes",
+      maxHistoryLength = 20,
+      chunkSize = 1000,
+      chunkOverlap = 200,
+      maxContextLength = 4000,
+      similarityThreshold = 0.7,
+    } = config;
+
+    this.qdrantManager = new QdrantManager();
+    this.jina = new JinaClient();
+    this.groqClient = new GroqClient();
+
+    this.mongoDbName = mongoDbName;
+    this.dbPromise = new MongoManager({ dbName: mongoDbName }).connect();
+    this.db = null;
+
+    this.collectionName = collectionName;
+    this.maxHistoryLength = maxHistoryLength;
+    this.chunkSize = chunkSize;
+    this.chunkOverlap = chunkOverlap;
+    this.maxContextLength = maxContextLength;
+    this.similarityThreshold = similarityThreshold;
+
+    this.config = config;
+  }
+
+  async initializeDB() {
+    if (!this.db) {
+      try {
+        this.db = await this.dbPromise;
+        console.log("✅ Database connection established");
+        const collections = await this.db.listCollections().toArray();
+        console.log("Available collections:", collections.map(c => c.name));
+      } catch (error) {
+        console.error(" Error initializing database:", error);
+        throw error;
       }
-    };
-
-    this.conversationHistory = [];
-    this.currentClient = null;
-    
-    // Initialize all services
-    this.initialize();
-  }
-
-  async initialize() {
-    try {
-      // Initialize Groq client
-      this.groqClient = new GroqClient();
-      console.log("✅ Groq client initialized");
-
-      // Initialize MongoDB
-      await this.initializeMongoDB();
-      
-      // Initialize Qdrant
-      await this.initializeQdrant();
-      
-      // Initialize MCP
-      await this.initializeShopifyMCP();
-      
-      console.log("🚀 Shopify Development Consultant Agent ready!");
-    } catch (error) {
-      console.error("❌ Initialization error:", error);
-    }
-  }
-
-  async initializeMongoDB() {
-    try {
-      this.mongoClient = new MongoClient(this.config.mongodb.uri);
-      await this.mongoClient.connect();
-      this.db = this.mongoClient.db(this.config.mongodb.dbName);
-      
-      // Create indexes for better performance
-      await this.createMongoIndexes();
-      console.log("✅ MongoDB connected");
-    } catch (error) {
-      console.error("❌ MongoDB initialization failed:", error);
-      this.mongoClient = null;
     }
   }
 
   async createMongoIndexes() {
     try {
-      await this.db.collection(this.config.mongodb.collections.conversations)
+      await this.db.collection('chat_messages')
         .createIndex({ clientId: 1, timestamp: -1 });
-      await this.db.collection(this.config.mongodb.collections.clients)
+
+      await this.db.collection('clients')
         .createIndex({ email: 1 }, { unique: true });
+
       await this.db.collection(this.config.mongodb.collections.quotes)
         .createIndex({ clientId: 1, createdAt: -1 });
+
+      console.log("✅ MongoDB indexes created");
     } catch (error) {
-      console.log("Index creation warning:", error.message);
+      console.log("⚠️ Index creation warning:", error.message);
     }
   }
 
@@ -100,8 +73,7 @@ class ShopifyDevConsultantAgent {
         url: this.config.qdrant.url,
         apiKey: this.config.qdrant.apiKey,
       });
-      
-      // Check connection
+
       await this.qdrantClient.getCollections();
       console.log("✅ Qdrant connected");
     } catch (error) {
@@ -126,14 +98,14 @@ class ShopifyDevConsultantAgent {
       );
 
       const connectPromise = this.mcpClient.connect(transport);
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("MCP connect timeout")), 10000)
       );
-      
+
       await Promise.race([connectPromise, timeoutPromise]);
-      
+
       const tools = await this.mcpClient.listTools();
-      console.log("✅ Shopify Dev MCP connected. Available tools:", 
+      console.log("✅ Shopify Dev MCP connected. Available tools:",
         tools.tools?.map(t => t.name).slice(0, 5));
     } catch (error) {
       console.error("❌ Shopify MCP initialization failed:", error);
@@ -144,13 +116,11 @@ class ShopifyDevConsultantAgent {
   async processConsultationMessage(message, clientInfo = null) {
     try {
       console.log('🔄 Processing consultation message:', message);
-      
-      // Store client info if provided
+
       if (clientInfo) {
         this.currentClient = await this.upsertClient(clientInfo);
       }
 
-      // Store conversation in MongoDB
       const conversationId = await this.storeConversation({
         role: 'user',
         content: message,
@@ -158,7 +128,6 @@ class ShopifyDevConsultantAgent {
         timestamp: new Date()
       });
 
-      // Analyze the message intent
       const intent = await this.analyzeConsultationIntent(message);
       console.log('🎯 Detected intent:', intent);
 
@@ -484,7 +453,7 @@ Focus on relevant examples that match the client's needs.`;
     if (!this.db) return null;
     
     try {
-      const result = await this.db.collection(this.config.mongodb.collections.clients)
+      const result = await this.db.collection('clients')
         .findOneAndUpdate(
           { email: clientInfo.email },
           { 
@@ -508,7 +477,7 @@ Focus on relevant examples that match the client's needs.`;
     if (!this.db) return null;
     
     try {
-      const result = await this.db.collection(this.config.mongodb.collections.conversations)
+      const result = await this.db.collection('chat_messages')
         .insertOne(conversationData);
       return result.insertedId;
     } catch (error) {
@@ -521,7 +490,7 @@ Focus on relevant examples that match the client's needs.`;
     if (!this.db || !clientId) return [];
     
     try {
-      return await this.db.collection(this.config.mongodb.collections.conversations)
+      return await this.db.collection('chat_messages')
         .find({ clientId })
         .sort({ timestamp: -1 })
         .limit(limit)
@@ -532,46 +501,16 @@ Focus on relevant examples that match the client's needs.`;
     }
   }
 
-  // RAG Operations with Qdrant + Jina
-  async generateEmbedding(text) {
-    if (!this.config.jina.apiKey) {
-      console.error("Jina API key not configured");
-      return null;
-    }
-
-    try {
-      const response = await fetch(this.config.jina.baseUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.jina.apiKey}`
-        },
-        body: JSON.stringify({
-          input: [text],
-          model: 'jina-embeddings-v2-base-en'
-        })
-      });
-
-      const data = await response.json();
-      return data.data[0].embedding;
-    } catch (error) {
-      console.error("Embedding generation error:", error);
-      return null;
-    }
-  }
-
   async getSimilarQuotes(query) {
-    if (!this.qdrantClient) return [];
 
     try {
-      const embedding = await this.generateEmbedding(query);
+     const embedding = await this.jina.embedText(
+        query,
+        "jina-embeddings-v2-base-en"
+      );
       if (!embedding) return [];
 
-      const results = await this.qdrantClient.search(this.config.qdrant.collections.quotes, {
-        vector: embedding,
-        limit: 5,
-        with_payload: true
-      });
+   const results =  await this.qdrantManager.search(this.collectionName, embedding);
 
       return results.map(r => r.payload);
     } catch (error) {
@@ -581,17 +520,15 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async getSimilarProjects(query) {
-    if (!this.qdrantClient) return [];
-
+   
     try {
-      const embedding = await this.generateEmbedding(query);
+      const embedding = await this.jina.embedText(
+        query,
+        "jina-embeddings-v2-base-en"
+      );
       if (!embedding) return [];
 
-      const results = await this.qdrantClient.search(this.config.qdrant.collections.projects, {
-        vector: embedding,
-        limit: 5,
-        with_payload: true
-      });
+   const results =  await this.qdrantManager.search(this.collectionName, embedding);
 
       return results.map(r => r.payload);
     } catch (error) {
@@ -604,14 +541,13 @@ Focus on relevant examples that match the client's needs.`;
     if (!this.qdrantClient) return [];
 
     try {
-      const embedding = await this.generateEmbedding(query);
+       const embedding = await this.jina.embedText(
+        query,
+        "jina-embeddings-v2-base-en"
+      );
       if (!embedding) return [];
 
-      const results = await this.qdrantClient.search(this.config.qdrant.collections.knowledge, {
-        vector: embedding,
-        limit: 3,
-        with_payload: true
-      });
+        const results =  await this.qdrantManager.search(this.collectionName, embedding);
 
       return results.map(r => r.payload);
     } catch (error) {
@@ -621,25 +557,26 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async storeQuoteRequest(query, response, intent) {
-    if (!this.qdrantClient) return;
 
     try {
-      const embedding = await this.generateEmbedding(query);
-      if (!embedding) return;
-
-      await this.qdrantClient.upsert(this.config.qdrant.collections.quotes, {
-        points: [{
-          id: Date.now(),
-          vector: embedding,
-          payload: {
-            query,
-            response,
-            intent,
-            timestamp: new Date().toISOString(),
-            clientId: this.currentClient?._id?.toString()
-          }
-        }]
+      const points = [];
+      const embedding = await this.jina.embedText(
+        query,
+        "jina-embeddings-v2-base-en"
+      );
+      points.push({
+        vector: embedding,
+        payload: {
+          query,
+          response,
+          intent,
+          timestamp: new Date().toISOString(),
+          clientId: this.currentClient?._id?.toString()
+        }
       });
+      // 5️⃣ Store in Qdrant
+      await this.qdrantManager.addDocuments(this.collectionName, points);
+
     } catch (error) {
       console.error("Quote storage error:", error);
     }

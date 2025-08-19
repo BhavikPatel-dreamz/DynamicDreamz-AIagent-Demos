@@ -163,7 +163,6 @@ class PDFRAGAgent {
         }
 
         // 5️⃣ Store in Qdrant
-        console.log(points,"#####")
         await this.qdrantManager.addDocuments(this.collectionName, points);
 
         results.push({
