@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
             isArray: Array.isArray(embedding),
             length: embedding?.length,
             sample: embedding?.slice(0, 5), // First 5 values for debugging
-            isValidNumbers: embedding?.every(num => typeof num === 'number' && !isNaN(num))
+            isValidNumbers: embedding?.every((num: number) => typeof num === 'number' && !isNaN(num))
           });
 
           // Validate embedding format
@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
             isArray: Array.isArray(embedding),
             length: embedding?.length,
             sample: embedding?.slice(0, 5),
-            isValidNumbers: embedding?.every(num => typeof num === 'number' && !isNaN(num))
+            isValidNumbers: embedding?.every((num: number) => typeof num === 'number' && !isNaN(num))
           });
 
           // Validate embedding format

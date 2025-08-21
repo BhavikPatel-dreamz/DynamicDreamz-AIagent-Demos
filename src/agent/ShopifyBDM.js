@@ -1,8 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { QdrantClient } from '@qdrant/js-client-rest';
-import GroqClient from "@/Clients/GroqClient";
-import MongoManager from "@/Clients/MongoManager";
+import GroqClient from "../Clients/GroqClient.js";
+import QdrantManager from "../Clients/QdrantManager.js";
+import JinaClient from "../Clients/JinaClient.js";
+import MongoManager from "../Clients/MongoManager.js";
+
 
 class ShopifyDevConsultantAgent {
   constructor(sessionId = null) {
@@ -312,7 +314,8 @@ class ShopifyDevConsultantAgent {
   async processConsultationMessage(message, clientInfo = null) {
     try {
       console.log('🔄 Processing consultation message:', message);
-
+      
+      // Store client info if provided
       if (clientInfo) {
         this.currentClient = await this.upsertClient(clientInfo);
       }
@@ -915,7 +918,7 @@ Be thorough and ask clarifying questions to better understand the scope.`;
       
       return response;
     } catch (error) {
-     console.error("Project scoping failed:", error);
+      return this.getFallbackScopingResponse(intent);
     }
   }
 
@@ -1036,10 +1039,10 @@ Focus on relevant examples that match the client's needs.`;
 
   // MongoDB Operations
   async upsertClient(clientInfo) {
-      if (!this.db) await this.initializeDB();
+    if (!this.db) return null;
     
     try {
-      const result = await this.db.collection('clients')
+      const result = await this.db.collection(this.config.mongodb.collections.clients)
         .findOneAndUpdate(
           { email: clientInfo.email },
           { 
@@ -1060,7 +1063,7 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async storeConversation(conversationData) {
-      if (!this.db) await this.initializeDB();
+    if (!this.db) return null;
     
     try {
       const conversation = {
@@ -1079,10 +1082,10 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async getConversationHistory(clientId, limit = 10) {
-       if (!this.db) await this.initializeDB();
+    if (!this.db || !clientId) return [];
     
     try {
-      return await this.db.collection('chat_messages')
+      return await this.db.collection(this.config.mongodb.collections.conversations)
         .find({ clientId })
         .sort({ timestamp: -1 })
         .limit(limit)
@@ -1093,13 +1096,39 @@ Focus on relevant examples that match the client's needs.`;
     }
   }
 
-  async getSimilarQuotes(query) {
+  // RAG Operations with Qdrant + Jina
+  async generateEmbedding(text) {
+    if (!this.config.jina.apiKey) {
+      console.error("Jina API key not configured");
+      return null;
+    }
 
     try {
-     const embedding = await this.jina.embedText(
-        query,
-        "jina-embeddings-v2-base-en"
-      );
+      const response = await fetch(this.config.jina.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.jina.apiKey}`
+        },
+        body: JSON.stringify({
+          input: [text],
+          model: 'jina-embeddings-v2-base-en'
+        })
+      });
+
+      const data = await response.json();
+      return data.data[0].embedding;
+    } catch (error) {
+      console.error("Embedding generation error:", error);
+      return null;
+    }
+  }
+
+  async getSimilarQuotes(query) {
+    if (!this.qdrantClient) return [];
+
+    try {
+      const embedding = await this.generateEmbedding(query);
       if (!embedding) return [];
 
       // Ensure the collection exists before searching
@@ -1127,12 +1156,10 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async getSimilarProjects(query) {
-   
+    if (!this.qdrantClient) return [];
+
     try {
-      const embedding = await this.jina.embedText(
-        query,
-        "jina-embeddings-v2-base-en"
-      );
+      const embedding = await this.generateEmbedding(query);
       if (!embedding) return [];
 
       // Ensure the collection exists with proper configuration
@@ -1174,10 +1201,7 @@ Focus on relevant examples that match the client's needs.`;
     if (!this.qdrantClient) return [];
 
     try {
-       const embedding = await this.jina.embedText(
-        query,
-        "jina-embeddings-v2-base-en"
-      );
+      const embedding = await this.generateEmbedding(query);
       if (!embedding) return [];
 
       // Ensure the collection exists with proper configuration
@@ -1216,26 +1240,25 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async storeQuoteRequest(query, response, intent) {
+    if (!this.qdrantClient) return;
 
     try {
-      const points = [];
-      const embedding = await this.jina.embedText(
-        query,
-        "jina-embeddings-v2-base-en"
-      );
-      points.push({
-        vector: embedding,
-        payload: {
-          query,
-          response,
-          intent,
-          timestamp: new Date().toISOString(),
-          clientId: this.currentClient?._id?.toString()
-        }
-      });
-      // 5️⃣ Store in Qdrant
-      await this.qdrantManager.addDocuments(this.collectionName, points);
+      const embedding = await this.generateEmbedding(query);
+      if (!embedding) return;
 
+      await this.qdrantClient.upsert(this.config.qdrant.collections.quotes, {
+        points: [{
+          id: Date.now(),
+          vector: embedding,
+          payload: {
+            query,
+            response,
+            intent,
+            timestamp: new Date().toISOString(),
+            clientId: this.currentClient?._id?.toString()
+          }
+        }]
+      });
     } catch (error) {
       console.error("Quote storage error:", error);
     }
