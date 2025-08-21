@@ -37,6 +37,20 @@ const pages = [
     tech: "Next.js, React, TypeScript, Tailwind CSS",
     Ai: "AI-powered shopping assistance with chat interface",
   },
+  {
+    title: "Shopify BDM Consultant Chat",
+    path: "/shopify-bdm-chat",
+    description: "AI-powered Shopify Business Development Manager consultant for quotes, technical questions, and project scoping.",
+    tech: "Next.js, React, TypeScript, MongoDB, Qdrant",
+    Ai: "Groq LLM with RAG capabilities for Shopify consultation",
+  },
+  {
+    title: "Shopify Admin Panel",
+    path: "/shopify-admin",
+    description: "Upload and manage your previous Shopify projects and quotes to help the AI agent provide better consultation.",
+    tech: "Next.js, React, TypeScript, MongoDB",
+    Ai: "Project & Quote management for enhanced AI consultation",
+  },
   // Add more pages here as needed
 ];
 

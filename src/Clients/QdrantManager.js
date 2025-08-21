@@ -98,6 +98,18 @@ class QdrantManager {
         payload: doc.payload || {}
       }));
 
+      // Debug logging
+      console.log('Adding documents to Qdrant:', {
+        collectionName,
+        pointsCount: points.length,
+        samplePoint: {
+          id: points[0]?.id,
+          vectorType: typeof points[0]?.vector,
+          vectorIsArray: Array.isArray(points[0]?.vector),
+          vectorLength: points[0]?.vector?.length,
+          payloadKeys: Object.keys(points[0]?.payload || {})
+        }
+      });
 
       const result = await this.client.upsert(collectionName, {
         wait: true,
