@@ -312,8 +312,7 @@ class ShopifyDevConsultantAgent {
   async processConsultationMessage(message, clientInfo = null) {
     try {
       console.log('🔄 Processing consultation message:', message);
-      
-      // Store client info if provided
+
       if (clientInfo) {
         this.currentClient = await this.upsertClient(clientInfo);
       }
@@ -916,7 +915,7 @@ Be thorough and ask clarifying questions to better understand the scope.`;
       
       return response;
     } catch (error) {
-      return this.getFallbackScopingResponse(intent);
+     console.error("Project scoping failed:", error);
     }
   }
 
@@ -1037,10 +1036,10 @@ Focus on relevant examples that match the client's needs.`;
 
   // MongoDB Operations
   async upsertClient(clientInfo) {
-    if (!this.db) return null;
+      if (!this.db) await this.initializeDB();
     
     try {
-      const result = await this.db.collection(this.config.mongodb.collections.clients)
+      const result = await this.db.collection('clients')
         .findOneAndUpdate(
           { email: clientInfo.email },
           { 
@@ -1061,7 +1060,7 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async storeConversation(conversationData) {
-    if (!this.db) return null;
+      if (!this.db) await this.initializeDB();
     
     try {
       const conversation = {
@@ -1080,10 +1079,10 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async getConversationHistory(clientId, limit = 10) {
-    if (!this.db || !clientId) return [];
+       if (!this.db) await this.initializeDB();
     
     try {
-      return await this.db.collection(this.config.mongodb.collections.conversations)
+      return await this.db.collection('chat_messages')
         .find({ clientId })
         .sort({ timestamp: -1 })
         .limit(limit)
@@ -1094,39 +1093,13 @@ Focus on relevant examples that match the client's needs.`;
     }
   }
 
-  // RAG Operations with Qdrant + Jina
-  async generateEmbedding(text) {
-    if (!this.config.jina.apiKey) {
-      console.error("Jina API key not configured");
-      return null;
-    }
-
-    try {
-      const response = await fetch(this.config.jina.baseUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.jina.apiKey}`
-        },
-        body: JSON.stringify({
-          input: [text],
-          model: 'jina-embeddings-v2-base-en'
-        })
-      });
-
-      const data = await response.json();
-      return data.data[0].embedding;
-    } catch (error) {
-      console.error("Embedding generation error:", error);
-      return null;
-    }
-  }
-
   async getSimilarQuotes(query) {
-    if (!this.qdrantClient) return [];
 
     try {
-      const embedding = await this.generateEmbedding(query);
+     const embedding = await this.jina.embedText(
+        query,
+        "jina-embeddings-v2-base-en"
+      );
       if (!embedding) return [];
 
       // Ensure the collection exists before searching
@@ -1154,10 +1127,12 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async getSimilarProjects(query) {
-    if (!this.qdrantClient) return [];
-
+   
     try {
-      const embedding = await this.generateEmbedding(query);
+      const embedding = await this.jina.embedText(
+        query,
+        "jina-embeddings-v2-base-en"
+      );
       if (!embedding) return [];
 
       // Ensure the collection exists with proper configuration
@@ -1199,7 +1174,10 @@ Focus on relevant examples that match the client's needs.`;
     if (!this.qdrantClient) return [];
 
     try {
-      const embedding = await this.generateEmbedding(query);
+       const embedding = await this.jina.embedText(
+        query,
+        "jina-embeddings-v2-base-en"
+      );
       if (!embedding) return [];
 
       // Ensure the collection exists with proper configuration
@@ -1238,25 +1216,26 @@ Focus on relevant examples that match the client's needs.`;
   }
 
   async storeQuoteRequest(query, response, intent) {
-    if (!this.qdrantClient) return;
 
     try {
-      const embedding = await this.generateEmbedding(query);
-      if (!embedding) return;
-
-      await this.qdrantClient.upsert(this.config.qdrant.collections.quotes, {
-        points: [{
-          id: Date.now(),
-          vector: embedding,
-          payload: {
-            query,
-            response,
-            intent,
-            timestamp: new Date().toISOString(),
-            clientId: this.currentClient?._id?.toString()
-          }
-        }]
+      const points = [];
+      const embedding = await this.jina.embedText(
+        query,
+        "jina-embeddings-v2-base-en"
+      );
+      points.push({
+        vector: embedding,
+        payload: {
+          query,
+          response,
+          intent,
+          timestamp: new Date().toISOString(),
+          clientId: this.currentClient?._id?.toString()
+        }
       });
+      // 5️⃣ Store in Qdrant
+      await this.qdrantManager.addDocuments(this.collectionName, points);
+
     } catch (error) {
       console.error("Quote storage error:", error);
     }
